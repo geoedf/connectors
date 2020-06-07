@@ -19,6 +19,3 @@ Stage1 += shell(commands=['cd /tmp/faoinput', 'pip3 install .'])
 # Make scripts executable
 Stage1 += shell(commands=['chmod a+x /usr/local/bin/*.sh', 'chmod a+x /usr/local/bin/*.py', 'chmod -R go+rX /usr/local/lib/python3.6/dist-packages'])
 
-
-
-

@@ -26,10 +26,10 @@ jobs:
         with:
           python-version: 3.6
 
-      - name: Set up Go 1.12
+      - name: Set up Go 1.13
         uses: actions/setup-go@v1
         with:
-          go-version: 1.12
+          go-version: 1.13
 
       - name: Install Dependencies
         run: |
@@ -46,7 +46,7 @@ jobs:
 
       - name: Install Singularity
         env:
-          SINGULARITY_VERSION: 3.2.1
+          SINGULARITY_VERSION: 3.5.2
         run: |
           sudo mkdir -p /usr/local/var/singularity/mnt && \
           mkdir -p /tmp/src/github.com/sylabs && \
@@ -82,6 +82,7 @@ jobs:
         run: |
           echo $TOKEN | singularity remote add geoedf https://www.registry.geoedf.org
           singularity remote use geoedf
+          singularity remote list
           dir=$(pwd)
           for folder in ${{ steps.track-changes.outputs.folders }}; do
               echo "Building connector plugin $folder"
@@ -95,6 +96,7 @@ jobs:
                 sudo -E singularity build ${OUTPUT_CONTAINER} ${SINGULARITY_RECIPE}
 
                 if [ -f "${OUTPUT_CONTAINER}" ]; then
+                  singularity remote list
                   singularity push -U ${OUTPUT_CONTAINER} library://rkalyanapurdue/connectors/$folder
                 else
                   echo "Container build failed."
