@@ -66,15 +66,12 @@ jobs:
         id: checkout-repo
         uses: actions/checkout@v2
         with:
-        fetch-depth: 0   # fetch entire history to determine which files changed in this commit
-	
+          fetch-depth: 0
       - name: Track Changes
         id: track-changes
         uses: rkalyanapurdue/track-changes-docker-action@v7
-	
       - name: Output Folders
         run: echo "Connector plugin(s) changed: ${{ steps.track-changes.outputs.folders }}"
-	
       - name: Loop and Build
         env:
 	  HPCCM_RECIPE: recipe.hpccm
