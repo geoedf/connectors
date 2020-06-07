@@ -71,7 +71,7 @@ jobs:
         id: track-changes
         uses: rkalyanapurdue/track-changes-docker-action@v7
       - name: Output Folders
-        run: echo "Connector plugins changed: ${{ steps.track-changes.outputs.folders }}"
+        run: echo "Connector plugins changed ${{ steps.track-changes.outputs.folders }}"
       - name: Loop and Build
         env:
           HPCCM_RECIPE: recipe.hpccm
@@ -83,7 +83,7 @@ jobs:
           singularity remote use geoedf
           dir=$(pwd)
           for folder in ${{ steps.track-changes.outputs.folders }}; do
-              echo "Building connector plugin: $folder"
+              echo "Building connector plugin $folder"
               cd $dir/$folder
               if [ -f "${HPCCM_RECIPE}" ]; then
                 hpccm --recipe ${HPCCM_RECIPE} --format singularity --singularity-version=3.2 > ${SINGULARITY_RECIPE}
