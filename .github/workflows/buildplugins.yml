@@ -56,7 +56,8 @@ jobs:
           cd singularity && \
           ./mconfig -p /usr/local && \
           make -C builddir && \
-          sudo make -C builddir install          
+          sudo make -C builddir install && \
+          mkdir ~/.singularity
 
       - name: Install hpccm
         run: |
