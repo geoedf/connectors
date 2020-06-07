@@ -98,6 +98,7 @@ jobs:
                   singularity push -U ${OUTPUT_CONTAINER} library://rkalyanapurdue/connectors/$folder
                 else
                   echo "Container build failed."
+                fi
               else
                 echo "Singularity recipe ${SINGULARITY_RECIPE} was not created."
               fi
