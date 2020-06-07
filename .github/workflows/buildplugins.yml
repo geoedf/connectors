@@ -74,10 +74,10 @@ jobs:
         run: echo "Connector plugin(s) changed: ${{ steps.track-changes.outputs.folders }}"
       - name: Loop and Build
         env:
-	  HPCCM_RECIPE: recipe.hpccm
+          HPCCM_RECIPE: recipe.hpccm
           SINGULARITY_RECIPE: Singularity
           OUTPUT_CONTAINER: container.sif
-	  TOKEN: ${{ secrets.TOKEN }}
+          TOKEN: ${{ secrets.TOKEN }}
         run: |
           echo $TOKEN | singularity remote add geoedf https://www.registry.geoedf.org
           singularity remote use geoedf
@@ -94,9 +94,9 @@ jobs:
                 sudo -E singularity build ${OUTPUT_CONTAINER} ${SINGULARITY_RECIPE}
 
                 if [ -f "${OUTPUT_CONTAINER}" ]; then
-		  singularity push -U ${OUTPUT_CONTAINER} library://rkalyanapurdue/connectors/$folder
-		else
-		  echo "Container build failed."
+                  singularity push -U ${OUTPUT_CONTAINER} library://rkalyanapurdue/connectors/$folder
+                else
+                  echo "Container build failed."
               else
                 echo "Singularity recipe ${SINGULARITY_RECIPE} was not created."
               fi
