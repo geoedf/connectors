@@ -71,7 +71,7 @@ jobs:
         id: track-changes
         uses: rkalyanapurdue/track-changes-docker-action@v7
       - name: Output Folders
-        run: echo "Connector plugin(s) changed: ${{ steps.track-changes.outputs.folders }}"
+        run: echo "Connector plugins changed: ${{ steps.track-changes.outputs.folders }}"
       - name: Loop and Build
         env:
           HPCCM_RECIPE: recipe.hpccm
