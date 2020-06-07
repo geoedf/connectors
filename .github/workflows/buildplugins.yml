@@ -81,7 +81,6 @@ jobs:
           TOKEN: ${{ secrets.TOKEN }}
         run: |
           echo $TOKEN | singularity remote add geoedf https://www.registry.geoedf.org
-          singularity remote login geoedf
           singularity remote use geoedf
           dir=$(pwd)
           for folder in ${{ steps.track-changes.outputs.folders }}; do
