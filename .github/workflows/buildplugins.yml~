@@ -1,0 +1,39 @@
+# This workflow determine which connector plugins have changed,
+# builds and pushes a Singularity container for each of those connector plugins
+
+name: buildplugins
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the master branch
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      - name: Checkout Repo
+        id: checkout-repo
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0   # fetch entire history to determine which files changed in this commit
+      - name: Track Changes
+        id: track-changes
+        uses: rkalyanapurdue/track-changes-docker-action@v7
+      - name: Output Folders
+        run: echo "Connector plugin(s) changed: ${{ steps.track-changes.outputs.folders }}"
+      - name: Loop and Build
+        run: |
+          dir=$(pwd)
+          for folder in ${{ steps.track-changes.outputs.folders }}; do
+              echo "Building connector plugin: $folder"
+              cd $dir/$folder
+          done
