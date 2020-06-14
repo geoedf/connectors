@@ -1,2 +1,1 @@
-# connectors
-GeoEDF connectors
+# GeoEDF Connector Plugins
