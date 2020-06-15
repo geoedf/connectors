@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-setup(name='nasaconnector',
+setup(name='nasainput',
       version='0.1',
       description='Connector for accessing NASA DAAC datasets)',
       url='http://github.com/geoedf/connectors',
