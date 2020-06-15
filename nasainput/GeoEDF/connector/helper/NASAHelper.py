@@ -12,7 +12,7 @@ from .HTMLHelper import HTMLHelper
     This module is primarily intended for use with the NASAInput connector.
     It is assumed that we need to login to EarthData to be able to access this 
     dataset. 
-    Follows the example here: https://wiki.earthdata.nasa.gov/display/EL/How+To+Access+Data+With+Python
+    Based on the example here: https://wiki.earthdata.nasa.gov/display/EL/How+To+Access+Data+With+Python
 """
 
 # overriding requests.Session.rebuild_auth to mantain headers when redirected
