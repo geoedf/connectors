@@ -1,1 +1,2 @@
-This is a connector to download datasets from NASA DAAC repositories
+# NASA Input
+Connector Input plugin to download datasets from NASA DAAC repositories
