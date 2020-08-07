@@ -3,14 +3,14 @@ from geoedfframework.GeoEDFPlugin import GeoEDFPlugin
 
 import requests
 import os
-import zipfile
 
 class WQPInput(GeoEDFPlugin):
 
-    base_url = "https://cida.usgs.gov/nldi/comid/"
+    base_url = "https://www.waterqualitydata.us/data"
+    target_path = "data"
     # no optional params yet, but keep around for future extension
-    __optional_params = []
-    __required_params = ['comid']
+    __optional_params = ['start_date','end_date']
+    __required_params = ['site_id']
 
     # we use just kwargs since we need to be able to process the list of attributes
     # and their values to create the dependency graph in the GeoEDFInput super class
@@ -34,8 +34,6 @@ class WQPInput(GeoEDFPlugin):
             # if key not provided in optional arguments, defaults value to None
             setattr(self,key,kwargs.get(key,None))
 
-        # REST query for sites within 5 kilometers of feature with specified CONID
-        url = self.base_url+self.comid+"/navigate/UM/wqp/?distance=5"
         # class super class init
         super().__init__()
 
@@ -43,29 +41,18 @@ class WQPInput(GeoEDFPlugin):
     # if error, raise exception; if not, return True
 
     def get(self):
-        # call functions from this module
+        if (self.start_date == None):
+            self.start_date = ''
+        if (self.end_date == None):
+            self.end_date = '05-01-2020'
+
+        wqp_url = self.base_url+"/Result/search?siteid="+self.site_id+"&StartDateLo="+self.start_date+"&StartDateHi="+self.end_date+"&mimeType=csv"
+
         try:
-            link_request = requests.get(self.url)
-            wqp_request = link_request.json()
-
-            json_results = wqp_request['FeatureCollection']
-
-            for site in json_results:
-                site_id = site['identifier']
-                site_name = site['name']
-                site_uri = site['uri']
-                wqp_url = "https://www.waterqualitydata.us/data/Result/search?siteid="+site_id+"&mimeType=csv"
-                res = requests.get(url=wqp_url, stream=True)
-
-                out_path = '%s/%s' % (self.target_path,site_id)
-                with open(out_path,'wb') as out_file:
-                    for chunk in res.iter_content(chunk_size=1024*1024):
-                        out_file.write(chunk)
-
-                with zipfile.ZipFile(self.target_path + '/' + site_id, 'r') as zip_ref:
-                    zip_ref.extractall(self.target_path)
-
-                if os.path.exists(self.target_path + '/' + site_id):
-                    os.remove(self.target_path + '/' + site_id)
+            results = requests.get(url=wqp_url, stream=True)
+            out_path = '%s/%s.csv' % (self.target_path,self.site_id)
+            with open(out_path,'wb') as out_file:
+                for chunk in results.iter_content(chunk_size=1024*1024):
+                    out_file.write(chunk)
         except GeoEDFError:
             raise
