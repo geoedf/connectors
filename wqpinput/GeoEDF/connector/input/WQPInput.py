@@ -35,7 +35,7 @@ class WQPInput(GeoEDFPlugin):
             setattr(self,key,kwargs.get(key,None))
 
         # REST query for sites within 5 kilometers of feature with specified CONID
-        url = self.base_url+self.comid+"/navigate/UM/wqp/?distance=5"
+        self.url = self.base_url+self.comid+"/navigate/UM/wqp/?distance=5"
         # class super class init
         super().__init__()
 
