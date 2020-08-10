@@ -2,16 +2,14 @@ $1:
    Input:
       WQPInput:
          site_id: 'USGS-03206000'
-         start_date: %{start_date}
-         end_date: %{end_date}
+         start_date: "%{start_dt}"
+         end_date: "%{end_dt}"
    Filter:
-      start_data:
+      start_dt:
          DateTimeFilter:
             pattern: '%m-%d-%Y'
             start: 01/01/1970
-      end_data:
+      end_dt:
          DateTimeFilter:
             pattern: '%m-%d-%Y'
             start: 08/01/2020
-
-
