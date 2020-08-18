@@ -1,14 +1,22 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 from geoedfframework.utils.GeoEDFError import GeoEDFError
 from geoedfframework.GeoEDFPlugin import GeoEDFPlugin
 
 import requests
 import os
 
+""" Module for implementing the WQP input connector plugin. WQP (Water Quality Portal)
+    is a public web service (REST API) operated by the US EPA and USGS.
+    This module will implement the get() method required for all input plugins.
+"""
+
 class WQPInput(GeoEDFPlugin):
 
     base_url = "https://www.waterqualitydata.us/data"
     target_path = "data"
-    # no optional params yet, but keep around for future extension
+ 
     __optional_params = ['start_date','end_date']
     __required_params = ['site_id']
 
@@ -41,18 +49,24 @@ class WQPInput(GeoEDFPlugin):
     # if error, raise exception; if not, return True
 
     def get(self):
+        # set defaults if none provided
         if (self.start_date == None):
             self.start_date = ''
         if (self.end_date == None):
             self.end_date = '05-01-2020'
 
+        # build URL for REST API call
         wqp_url = self.base_url+"/Result/search?siteid="+self.site_id+"&StartDateLo="+self.start_date+"&StartDateHi="+self.end_date+"&mimeType=csv"
 
         try:
+            # do REST API GET call
             results = requests.get(url=wqp_url, stream=True)
+            # target_path is (re)set by the connector input instantiation
             out_path = '%s/%s.csv' % (self.target_path,self.site_id)
             with open(out_path,'wb') as out_file:
                 for chunk in results.iter_content(chunk_size=1024*1024):
                     out_file.write(chunk)
         except GeoEDFError:
+            raise
+        except:
             raise
