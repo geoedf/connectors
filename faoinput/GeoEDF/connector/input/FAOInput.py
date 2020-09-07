@@ -10,7 +10,7 @@ class FAOInput(GeoEDFPlugin):
     url = "http://fenixservices.fao.org/faostat/static/bulkdownloads/datasets_E.json"
     # no optional params yet, but keep around for future extension
     __optional_params = []
-    __required_params = ['dataset_names']
+    __required_params = ['dataset_codes']
 
     # we use just kwargs since we need to be able to process the list of attributes
     # and their values to create the dependency graph in the GeoEDFInput super class
@@ -49,20 +49,20 @@ class FAOInput(GeoEDFPlugin):
             json_datasets = fao_request['Datasets']
             final_data = json_datasets['Dataset']
 
-            for dataset_name in self.dataset_names:
+            for dataset_code in self.dataset_codes:
                 for dataset in final_data:
-                    if dataset['DatasetName'] == dataset_name:
+                    if dataset['DatasetCode'] == dataset_code:
                         res = requests.get(url=dataset['FileLocation'], stream=True)
 
-                        out_path = '%s/%s' % (self.target_path,dataset_name)
+                        out_path = '%s/%s' % (self.target_path,dataset_code)
                         with open(out_path,'wb') as out_file:
                             for chunk in res.iter_content(chunk_size=1024*1024):
                                 out_file.write(chunk)
 
-                        with zipfile.ZipFile(self.target_path + '/' + dataset_name, 'r') as zip_ref:
+                        with zipfile.ZipFile(self.target_path + '/' + dataset_code, 'r') as zip_ref:
                             zip_ref.extractall(self.target_path)
 
-                        if os.path.exists(self.target_path + '/' + dataset_name):
-                            os.remove(self.target_path + '/' + dataset_name)
+                        if os.path.exists(self.target_path + '/' + dataset_code):
+                            os.remove(self.target_path + '/' + dataset_code)
         except GeoEDFError:
             raise
