@@ -5,6 +5,7 @@ from geoedfframework.utils.GeoEDFError import GeoEDFError
 from geoedfframework.GeoEDFPlugin import GeoEDFPlugin
 
 import pandas as pd
+import math
 
 """ Module for implementing the DateTimeFilter. This supports a date time string pattern 
     that specifies the kinds of values that will be returned from the filter. The user 
@@ -12,14 +13,16 @@ import pandas as pd
     and an optional end date. If an end date is provided, it is assumed that the user wants 
     to generate all dates between the start and end subject to a period parameter. The period 
     is a number followed by a character such as D,M,Y etc. for day, month and year. E.g. 2M is 
-    a period of 2 months. The DateTimeFilter is a pre filter that can be used to generate 
-    a string representation of all intervening dates.
+    a period of 2 months. The DateTimeFilter is a filter that can be used to generate 
+    a string representation of all intervening dates. The parameter exact_dates is used only when 
+    the period is nD. By default, we will attempt to return every nth day of the year; if exact_dates 
+    is true, we will return every nth day beginning at the exact start date.
 """
 
 class DateTimeFilter(GeoEDFPlugin):
     # has_time is Boolean, False by default
     # if end is provided, period also needs to be provided
-    __optional_params = ['end','period','has_time']
+    __optional_params = ['end','period','has_time','exact_dates']
     __required_params = ['pattern','start']
 
     # we use just kwargs since we need to be able to process the list of attributes
@@ -53,6 +56,9 @@ class DateTimeFilter(GeoEDFPlugin):
             if key == 'has_time':
                 if self.has_time is None:
                     self.has_time = False
+            if key == 'exact_dates':
+                if self.exact_dates is None:
+                    self.exact_dates = False
 
         # initialize filter values array
         self.values = []
@@ -84,6 +90,17 @@ class DateTimeFilter(GeoEDFPlugin):
 
         # use the period to generate all intervening dates
         try:
+            # if exact_dates is used and the period is n days, process differently
+            # essentially reset start date to align with period
+            if self.exact_dates and self.period[-1:] == 'D':
+                start_year = start_date.strftime('%Y')
+                start_day_of_year = int(start_date.strftime('%j'))
+                period_num = int(self.period[:-1])
+                # check if start day aligns with period
+                if (start_day_of_year - 1)%period_num > 0:
+                    new_start_day_of_year = math.ceil((start_day_of_year - 1)/period_num) * period_num
+                    start_date = pd.to_datetime('%d/%s' % (new_start_day_of_year,start_year),'%j/%Y')
+                    
             if self.end is not None:
                 all_dates = pd.date_range(start=start_date,end=end_date,freq=self.period)
             else:
