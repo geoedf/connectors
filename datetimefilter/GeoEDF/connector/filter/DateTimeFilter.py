@@ -92,14 +92,16 @@ class DateTimeFilter(GeoEDFPlugin):
         try:
             # if exact_dates is used and the period is n days, process differently
             # essentially reset start date to align with period
-            if self.exact_dates and self.period[-1:] == 'D':
+
+            if (not self.exact_dates) and (self.period[-1:] == 'D'):
+
                 start_year = start_date.strftime('%Y')
                 start_day_of_year = int(start_date.strftime('%j'))
                 period_num = int(self.period[:-1])
                 # check if start day aligns with period
                 if (start_day_of_year - 1)%period_num > 0:
-                    new_start_day_of_year = math.ceil((start_day_of_year - 1)/period_num) * period_num
-                    start_date = pd.to_datetime('%d/%s' % (new_start_day_of_year,start_year),'%j/%Y')
+                    new_start_day_of_year = math.ceil((start_day_of_year - 1)/period_num) * period_num + 1
+                    start_date = pd.to_datetime('%d/%s' % (new_start_day_of_year,start_year),format='%j/%Y')
                     
             if self.end is not None:
                 all_dates = pd.date_range(start=start_date,end=end_date,freq=self.period)
