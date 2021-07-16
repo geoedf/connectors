@@ -156,7 +156,7 @@ def getFile(url, auth=None, path=None):
                         
                         # get the name of the file to save
                         outFilename = getFilename(res,fileURL)
-                        outPath = '%s/%s' % (path,outFilename)
+                        outPath = '%s/%s' % (path,outFilename.strip('"'))
                         with open(outPath,'wb') as outFile:
                             for chunk in res.iter_content(chunk_size=1024*1024):
                                 outFile.write(chunk)
@@ -167,7 +167,7 @@ def getFile(url, auth=None, path=None):
 
                     # get the name of the file to save
                     outFilename = getFilename(res,url)
-                    outPath = '%s/%s' % (path,outFilename)
+                    outPath = '%s/%s' % (path,outFilename.strip('"'))
                     with open(outPath,'wb') as outFile:
                         for chunk in res.iter_content(chunk_size=1024*1024):
                             outFile.write(chunk)
