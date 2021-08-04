@@ -1,12 +1,12 @@
 from setuptools import setup, find_packages
 
-setup(name='datetimefilter',
+setup(name='httpinput',
       version='0.2',
-      description='Filter for producing DateTime strings in various formats)',
-      url='http://github.com/geoedf/datetimefilter',
+      description='Connector for accessing files at a given HTTP URL',
+      url='http://github.com/geoedf/connectors',
       author='Rajesh Kalyanam',
       author_email='rkalyanapurdue@gmail.com',
       license='MIT',
       packages=find_packages(),
-      install_requires=['pandas'],
+      install_requires=['requests'],
       zip_safe=False)

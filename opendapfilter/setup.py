@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='opendapfilter',
-      version='0.1',
+      version='0.2',
       description='Filter for producing direct HTTP URLs for files managed by an OpenDAP server',
       url='http://github.com/geoedf/opendapfilter',
       author='Rajesh Kalyanam',
