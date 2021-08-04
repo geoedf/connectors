@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='datetimefilter',
-      version='0.1',
+      version='0.2',
       description='Filter for producing DateTime strings in various formats)',
       url='http://github.com/geoedf/datetimefilter',
       author='Rajesh Kalyanam',
