@@ -75,36 +75,36 @@ class GeoRangeFilter(GeoEDFPlugin):
             if self.latmax <= 0:
                 # latmin is also < 0 since we've checked ordering
                 # we take abs value, flip for right range, and produce S#
-                lat_range = list(range(abs(self.latmax),abs(self.latmin)+1))
+                lat_range = list(range(abs(self.latmax),abs(self.latmin)+2))
                 lat_vals = list(map((lambda lat_val: 's%d' % lat_val),lat_range))
             else: #latmax is > 0
                 if self.latmin < 0:
                     # need to split into two ranges; upto 0 and then > 0
-                    lat_range1 = list(range(0,abs(self.latmin)+1))
+                    lat_range1 = list(range(0,abs(self.latmin)+2))
                     lat_vals = list(map((lambda lat_val: 's%d' % lat_val),lat_range1))
 
-                    lat_range2 = list(range(0,self.latmax+1))
+                    lat_range2 = list(range(0,self.latmax+2))
                     lat_vals += list(map((lambda lat_val: 'n%d' % lat_val),lat_range2))
                 else: #latmin is >= 0
-                    lat_range = list(range(self.latmin,self.latmax+1))
+                    lat_range = list(range(self.latmin,self.latmax+2))
                     lat_vals = list(map((lambda lat_val: 'n%d' % lat_val),lat_range))
 
             # process lon values
             if self.lonmax <= 0:
                 # lonmin is also < 0 since we've checked ordering
                 # we take abs value, flip for right range, and produce S#
-                lon_range = list(range(abs(self.lonmax),abs(self.lonmin)+1))
+                lon_range = list(range(abs(self.lonmax),abs(self.lonmin)+2))
                 lon_vals = list(map((lambda lon_val: 'w%03d' % lon_val),lon_range))
             else: #lonmax is > 0
                 if self.lonmin < 0:
                     # need to split into two ranges; upto 0 and then > 0
-                    lon_range1 = list(range(0,abs(self.lonmin)+1))
+                    lon_range1 = list(range(0,abs(self.lonmin)+2))
                     lon_vals = list(map((lambda lon_val: 'w%03d' % lon_val),lon_range1))
 
-                    lon_range2 = list(range(0,self.lonmax+1))
+                    lon_range2 = list(range(0,self.lonmax+2))
                     lon_vals += list(map((lambda lon_val: 'e%03d' % lon_val),lon_range2))
                 else: #lonmin is >= 0
-                    lon_range = list(range(self.lonmin,self.lonmax+1))
+                    lon_range = list(range(self.lonmin,self.lonmax+2))
                     lon_vals = list(map((lambda lon_val: 'e%03d' % lon_val),lon_range))
 
             # concatenate the lat and lon vals to produce a single string
