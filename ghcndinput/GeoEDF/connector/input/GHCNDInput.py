@@ -67,7 +67,7 @@ class GHCNDInput(GeoEDFPlugin):
             cdo_client = Client(self.token, default_units="None", default_limit=1000)
 
             # add a backup token if available
-            if self.backup_token is None:
+            if self.backup_token is not None:
                 cdo_client.backup_token = self.backup_token
 
             # fetch the GHCND data for this station and date range
