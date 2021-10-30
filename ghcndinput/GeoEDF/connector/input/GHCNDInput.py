@@ -64,10 +64,11 @@ class GHCNDInput(GeoEDFPlugin):
         # param checks complete
         try:
             # get a client for NCDC API usage
+            cdo_client = Client(self.token, default_units="None", default_limit=1000)
+
+            # add a backup token if available
             if self.backup_token is None:
-                cdo_client = Client(self.token, default_units="None", default_limit=1000)
-            else:
-                cdo_client = Client(token=self.token, backup_token=self.backup_token, default_units="None", default_limit=1000)
+                cdo_client.backup_token = self.backup_token
 
             # fetch the GHCND data for this station and date range
             station_data = cdo_client.get_data_by_station(
