@@ -10,13 +10,14 @@ from cdo_api_py import Client
 """ Module for implementing the GHCND input connector plugin. This plugin will retrieve data for 
     five specific meterological parameters for a given station ID and date range. The plugin returns 
     a CSV file for each parameter with data records for each intervening date. The CSV file is named 
-    based on the station and parameter. 
+    based on the station and parameter. A backup token is optional; it is useful when there are a large 
+    number of stations since the GHCND API restricts to 10,000 requests per day
 """
 
 class GHCNDInput(GeoEDFPlugin):
 
     # auth is also required by GHCNDInput
-    __optional_params = []
+    __optional_params = ['backup_token']
     __required_params = ['token','start_date','end_date','station_id']
 
     # we use just kwargs since we need to be able to process the list of attributes
@@ -63,7 +64,10 @@ class GHCNDInput(GeoEDFPlugin):
         # param checks complete
         try:
             # get a client for NCDC API usage
-            cdo_client = Client(self.token, default_units="None", default_limit=1000)
+            if self.backup_token is None:
+                cdo_client = Client(self.token, default_units="None", default_limit=1000)
+            else:
+                cdo_client = Client(token=self.token, backup_token=self.backup_token, default_units="None", default_limit=1000)
 
             # fetch the GHCND data for this station and date range
             station_data = cdo_client.get_data_by_station(
