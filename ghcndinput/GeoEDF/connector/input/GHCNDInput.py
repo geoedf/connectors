@@ -5,20 +5,20 @@ from geoedfframework.utils.GeoEDFError import GeoEDFError
 from geoedfframework.GeoEDFPlugin import GeoEDFPlugin
 
 import pandas as pd
+import requests
 from cdo_api_py import Client
 
 """ Module for implementing the GHCND input connector plugin. This plugin will retrieve data for 
     five specific meterological parameters for a given station ID and date range. The plugin returns 
     a CSV file for each parameter with data records for each intervening date. The CSV file is named 
-    based on the station and parameter. A backup token is optional; it is useful when there are a large 
-    number of stations since the GHCND API restricts to 10,000 requests per day
+    based on the station and parameter. The new NOAA API is used that does not require tokens.
 """
 
 class GHCNDInput(GeoEDFPlugin):
 
     # auth is also required by GHCNDInput
-    __optional_params = ['backup_token']
-    __required_params = ['token','start_date','end_date','station_id']
+    __optional_params = []
+    __required_params = ['start_date','end_date','station_id']
 
     # we use just kwargs since we need to be able to process the list of attributes
     # and their values to create the dependency graph in the GeoEDFInput super class
@@ -63,23 +63,20 @@ class GHCNDInput(GeoEDFPlugin):
             
         # param checks complete
         try:
-            # get a client for NCDC API usage
-            cdo_client = Client(self.token, default_units="None", default_limit=1000)
-
-            # add a backup token if available
-            if self.backup_token is not None:
-                cdo_client.backup_token = self.backup_token
-
-            # fetch the GHCND data for this station and date range
-            station_data = cdo_client.get_data_by_station(
-                               datasetid="GHCND",
-                               stationid=self.station_id,
-                               startdate=startdate,
-                               enddate=enddate,
-                               return_dataframe=True)
+            # parse out station_id
+            station_id = self.station_id.split(':')[1]
+            
+            # use new API
+            # construct URL
+            station_data_url = "https://www.ncei.noaa.gov/access/services/data/v1?dataset=daily-summaries&dataTypes=SNOW,PRCP,SNWD,TMIN,TMAX&stations=%s&startDate=2010-08-30&endDate=2020-09-30&format=json" % station_id
+            
+            res = requests.get(station_data_url)
+            res.raise_for_status()
+            
+            station_data = pd.read_json(res.text)
 
             # first reindex data by date
-            station_data.set_index(pd.to_datetime(station_data['date']), inplace=True)
+            station_data.set_index(pd.to_datetime(station_data['DATE']), inplace=True)
 
         except:
             print("Error fetching GHCND data for station %s in GHCNDInput" % self.station_id)

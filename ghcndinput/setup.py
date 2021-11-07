@@ -8,5 +8,5 @@ setup(name='ghcndinput',
       author_email='rkalyanapurdue@gmail.com',
       license='MIT',
       packages=find_packages(),
-      install_requires=['cdo-api-py','pandas'],
+      install_requires=['cdo-api-py','pandas','requests'],
       zip_safe=False)
