@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='faoconnector',
-      version='0.1',
+      version='0.2',
       description='Connector for U.N. FAOSTAT datasets',
       url='http://github.com/geoedf/faoinput',
       author='Rajesh Kalyanam',

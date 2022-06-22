@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='httpinput',
-      version='0.3',
+      version='0.4',
       description='Connector for accessing files at a given HTTP URL',
       url='http://github.com/geoedf/connectors',
       author='Rajesh Kalyanam',

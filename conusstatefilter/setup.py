@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='conusstatefilter',
-      version='0.1',
+      version='0.2',
       description='Filter for returning list of two char state codes for CONUS',
       url='http://github.com/geoedf/conusstatefilter',
       author='Rajesh Kalyanam',

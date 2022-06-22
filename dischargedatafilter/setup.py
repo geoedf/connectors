@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='dischargedatafilter',
-      version='0.1',
+      version='0.2',
       description='Filter for determining which gages have data coverage for dates above a given cutoff percentage',
       url='http://github.com/geoedf/dischargedatafilter',
       author='Rajesh Kalyanam',

@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='ghcndinput',
-      version='0.1',
+      version='0.2',
       description='Connector for accessing NOAA NCDC GHCND meterological datasets',
       url='http://github.com/geoedf/connectors',
       author='Rajesh Kalyanam',

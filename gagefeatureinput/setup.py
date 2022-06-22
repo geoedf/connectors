@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='gagefeatureinput',
-      version='0.1',
+      version='0.2',
       description='Connector for accessing and merging gage feature data from StreamCat database',
       url='http://github.com/geoedf/connectors',
       author='Rajesh Kalyanam',

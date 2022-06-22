@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='gagelocfilter',
-      version='0.1',
+      version='0.2',
       description='Filter for returning the gage IDs for gages that fall within the provided geo boundary',
       url='http://github.com/geoedf/gagelocfilter',
       author='Rajesh Kalyanam',
