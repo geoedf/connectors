@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='wqpinput',
-      version='0.2',
+      version='0.3',
       description='Connector for EPA/USGA Water Quality Portal',
       url='http://github.com/geoedf/connectors',
       author='Jack Smith',
