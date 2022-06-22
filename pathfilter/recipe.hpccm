@@ -17,10 +17,10 @@ Stage0 += pip(packages=['geoedfframework==0.6.0'],pip='pip3')
 Stage1 += environment(variables={'PATH':'/usr/local/bin:$PATH','PYTHONPATH':'/usr/local/lib/python3.6/dist-packages:$PYTHONPATH'})
 
 # Copy files
-Stage1 += copy(src='.',dest='/tmp/pathfilter')
+Stage1 += copy(src='.',dest='/pathfilter')
 
 # Install this package
-Stage1 += shell(commands=['cd /tmp/pathfilter', 'pip3 install .'])
+Stage1 += shell(commands=['cd /pathfilter', 'pip3 install .'])
 
 # Make scripts executable
 Stage1 += shell(commands=['chmod a+x /usr/local/bin/*.sh', 'chmod a+x /usr/local/bin/*.py', 'chmod -R go+rX /usr/local/lib/python3.6/dist-packages'])
