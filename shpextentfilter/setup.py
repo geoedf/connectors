@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='shpextentfilter',
-      version='0.3',
+      version='0.4',
       description='Filter for returning the lat-lon extents of given shapefile',
       url='http://github.com/geoedf/shpextentfilter',
       author='Rajesh Kalyanam',
