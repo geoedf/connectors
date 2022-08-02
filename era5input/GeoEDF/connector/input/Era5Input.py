@@ -47,8 +47,19 @@ class Era5Input(GeoEDFPlugin):
     # each Input plugin needs to implement this method
     # if error, raise exception; if not, return True
     def get(self):
+        #Checking the optional paramaters and setting default values if unset
+        if self.dataset is None: self.dataset = 'insitu-gridded-observations-global-and-regional'
+        if self.format is None: self.format = 'zip'
+        if self.region is None: self.region = 'conus'
+        if self.origin is None: self.origin = 'cpc_conus'
+        if self.variable is None: self.variable = 'precipitation'
+        if self.time_aggregation is None: self.time_aggregation = 'daily'
+        if self.horizontal_aggregation is None: self.horizontal_aggregation = '0_25_x_0_25'
+        if self.year is None: self.year =  ['1972', '1976', '1980']
+        if self.version is None: self.version = 'v1.0' 
         # Storing the contents of the config file 
-        config_file = "url: https://cds.climate.copernicus.eu/api/v2\nkey: " +self.uid + ":" + self.api_key +"\nverify: 0\n"
+        config_file = "url: https://cds.climate.copernicus.eu/api/v2\nkey:" +self.uid + ":" + self.api_key +"\nverify: 0\n"
+        print(config_file)
         # Writing the config file in the target_path location
         f = open(self.target_path+"/.cdsapirc", "w")
         f.write(config_file)
