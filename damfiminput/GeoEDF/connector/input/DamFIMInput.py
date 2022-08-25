@@ -72,13 +72,13 @@ class DamFIMInput(GeoEDFPlugin):
                     try:
                         file = urllib.request.urlretrieve(link, fileName)
                     except urllib.error.HTTPError as err:
-                        raise GeoEDFError("DamFIMInput for %s   - HTTPError" % self.dam_id)
+                        print("DamFIMInput for %s   - HTTPError" % self.dam_id)
                     except requests.exceptions.ConnectionError as err:
-                        raise GeoEDFError("DamFIMInput for %s   - ConnectionError" % self.dam_id)
+                        print("DamFIMInput for %s   - ConnectionError" % self.dam_id)
                     except requests.exceptions.Timeout:
-                        raise GeoEDFError("DamFIMInput for %s   - Timeout" % self.dam_id)
+                        print("DamFIMInput for %s   - Timeout" % self.dam_id)
                     except requests.exceptions.TooManyRedirects:
-                        raise GeoEDFError("DamFIMInput for %s   - TooManyRedirects" % self.dam_id)
+                        print("DamFIMInput for %s   - TooManyRedirects" % self.dam_id)
                     except requests.exceptions.RequestException as e:
-                        raise GeoEDFError("DamFIMInput for %s   - Error" % self.dam_id)
+                        print("DamFIMInput for %s   - Error" % self.dam_id)
         return True
