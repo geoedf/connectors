@@ -16,7 +16,7 @@ import shutil
 
 class Era5Input(GeoEDFPlugin):
 
-    __optional_params = ['dataset','format','region','origin','variable','time_aggregation','horizontal_aggregation','year','version']
+    __optional_params = ['dataset','format','region','origin','variable','time_aggregation','horizontal_aggregation','start_year','end_year','version']
     __required_params = ['uid','api_key']
 
     # we use just kwargs since we need to be able to process the list of attributes
@@ -55,7 +55,8 @@ class Era5Input(GeoEDFPlugin):
         if self.variable is None: self.variable = 'precipitation'
         if self.time_aggregation is None: self.time_aggregation = 'daily'
         if self.horizontal_aggregation is None: self.horizontal_aggregation = '0_25_x_0_25'
-        if self.year is None: self.year =  ['1972', '1976', '1980']
+        if self.start_year is None: self.start_year =  '1950'
+        if self.end_year is None: self.end_year = '2021'
         if self.version is None: self.version = 'v1.0' 
         # Storing the contents of the config file 
         config_file = "url: https://cds.climate.copernicus.eu/api/v2\nkey:" +self.uid + ":" + self.api_key +"\nverify: 0\n"
@@ -66,6 +67,14 @@ class Era5Input(GeoEDFPlugin):
         f.close()
         # Changing the cdsapi configuration file location
         os.environ['CDSAPI_RC'] = self.target_path +"/.cdsapirc"
+        # generate list of years
+        start_year_num = int(self.start_year)
+        end_year_num = int(self.end_year)
+        if start_year_num > end_year_num:
+            raise GeoEDFError('Start year needs to be earlier than end year in ERA5Input')
+        years = []
+        for year in range(start_year_num,end_year_num+1):
+            years.append(f'{year}')
         # Making the api call
         try:
             download_path = self.target_path + "/download.zip" 
@@ -80,7 +89,7 @@ class Era5Input(GeoEDFPlugin):
                     'variable': self.variable,        
                     'time_aggregation': self.time_aggregation,        
                     'horizontal_aggregation': self.horizontal_aggregation,        
-                    'year': self.year,       
+                    'year': years,       
                     'version': self.version,    
                 },   
                  download_path)
