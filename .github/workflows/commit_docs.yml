@@ -16,15 +16,12 @@ jobs:
       - name: pulling the repo
         # Pull the repo and copy all the old files, if new files exists use those updated ones instead
         run: |
-          git clone https://github.com/geoedf/geoedf
-          cp -n ./geoedf/docs/* ./
-          rm ./geoedf/docs/*
           find . -type f -name "*.rst"  > files.txt
+          git clone https://github.com/geoedf/geoedf
           while read p; do
-              mv "$p" ./geoedf/docs/
+              cp -f "$p" ./geoedf/docs/
               echo "$p"
           done <files.txt
-          ls -al
       - name: List of processors/connectors
         #Changing the files that contain the list of connectors.
         run: |
