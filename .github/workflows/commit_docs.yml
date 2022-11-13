@@ -62,7 +62,7 @@ jobs:
           SSH_DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_KEY }}
         with:
           source-directory: geoedf
-          destination-github-username: 'rkalyanapurdue'
+          destination-github-username: 'geoedf'
           destination-repository-name: 'geoedf'
           user-email: 'rkalyanapurdue@gmail.com'
           commit-message: See ORIGIN_COMMIT from $GITHUB_REF
