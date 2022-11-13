@@ -1,0 +1,71 @@
+# This workflow determine which processor have changed,
+# builds and pushes a Singularity container for each of those processor plugins
+
+name: commit_docs
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the master branch
+on:
+  push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: pulling the repo
+        # Pull the repo and copy all the old files, if new files exists use those updated ones instead
+        run: |
+          git clone https://github.com/geoedf/geoedf
+          cp -n ./geoedf/docs/* ./
+          rm ./geoedf/docs/*
+          find . -type f -name "*.rst"  > files.txt
+          while read p; do
+              mv "$p" ./geoedf/docs/
+              echo "$p"
+          done <files.txt
+          ls -al
+      - name: List of processors/connectors
+        #Changing the files that contain the list of connectors.
+        run: |
+          git clone https://github.com/geoedf/connectors.git
+          cd ./connectors/
+          ls -d */ | sed 's#/##' > connectors_list.txt
+          cp ./connectors_list.txt ./../geoedf
+          cd ../
+          cd ./geoedf
+          cd ./docs
+          rm filter-plugins.rst
+          rm input-plugins.rst
+          touch filter-plugins.rst
+          touch input-plugins.rst
+          echo ".. toctree::">> filter-plugins.rst
+          echo ".. toctree::">> input-plugins.rst
+          echo -e "   :maxdepth: 2">> filter-plugins.rst
+          echo -e "   :maxdepth: 3">> input-plugins.rst
+          echo -e "">> filter-plugins.rst
+          echo -e "">> input-plugins.rst
+          while read line; 
+          do 
+          if [[ "$line" == *"filter"* ]]; then
+            echo '   '$line>> filter-plugins.rst; 
+          fi
+          if [[ "$line" == *"input"* ]]; then
+            echo '   '$line>> input-plugins.rst; 
+          fi
+          done < ./../connectors_list.txt
+          rm ./../connectors_list.txt
+      - name: Pushes to another repository
+        id: push_directory
+        uses: cpina/github-action-push-to-another-repository@main
+        env:
+          SSH_DEPLOY_KEY: ${{ secrets.SSH_DEPLOY_KEY }}
+        with:
+          source-directory: geoedf
+          destination-github-username: 'rkalyanapurdue'
+          destination-repository-name: 'geoedf'
+          user-email: 'rkalyanapurdue@gmail.com'
+          commit-message: See ORIGIN_COMMIT from $GITHUB_REF
+          target-branch: master
+      - name: Test get variable exported by push-to-another-repository
+        run: echo $DESTINATION_CLONED_DIRECTORY
