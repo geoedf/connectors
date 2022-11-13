@@ -36,6 +36,12 @@ jobs:
           rm input-plugins.rst
           touch filter-plugins.rst
           touch input-plugins.rst
+          echo "Filter Plugins">>filter-plugins.rst
+          echo "=============">>filter-plugins.rst
+          echo -e "">> filter-plugins.rst
+          echo "Input Plugins">>input-plugins.rst
+          echo "=============">>input-plugins.rst
+          echo -e "">> input-plugins.rst
           echo ".. toctree::">> filter-plugins.rst
           echo ".. toctree::">> input-plugins.rst
           echo -e "   :maxdepth: 2">> filter-plugins.rst
