@@ -68,7 +68,7 @@ class CUAHSISubsetterInput(GeoEDFPlugin):
             west, south, east, north = self.get_huc12_extent()
             
             # next run the subsetter for these extents
-            submit_url = f'https://subset.cuahsi.org/nwm/v2_0/subset?llat={south}&llon={west}&ulat={north}&ulon={east}&hucs=[]'
+            submit_url = f'https://subset.cuahsi.org/nwm/v2_0/subset?llat={south}&llon={west}&ulat={north}&ulon={east}&hucs={self.huc12_id}'
             res = requests.get(submit_url)
             res.raise_for_status()
 
