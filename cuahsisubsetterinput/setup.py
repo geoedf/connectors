@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 
 setup(name='cuahsisubsetterinput',
-      version='0.1',
-      description='Connector for running the CUAHSI subsetter for a given HUC12 ID',
+      version='0.2',
+      description='Connector for running the CUAHSI subsetter for a given (list of) HUC12 IDs',
       url='http://github.com/geoedf/cuahsisubsetterinput',
       author='Rajesh Kalyanam',
       author_email='rkalyanapurdue@gmail.com',
