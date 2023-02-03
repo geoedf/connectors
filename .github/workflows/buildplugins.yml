@@ -94,8 +94,8 @@ jobs:
                 sudo -E singularity build ${OUTPUT_CONTAINER} ${SINGULARITY_RECIPE}
 
                 if [ -f "${OUTPUT_CONTAINER}" ]; then
-                  echo "library://geoedfproject/connectors/$folder:latest"
-                  singularity push -U ${OUTPUT_CONTAINER} library://geoedfproject/connectors/$folder:latest
+                  echo "library://geoedf/connectors/$folder:latest"
+                  singularity push -U ${OUTPUT_CONTAINER} library://geoedf/connectors/$folder:latest
                 else
                   echo "Container build failed."
                 fi
