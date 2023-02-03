@@ -47,11 +47,15 @@ class CUAHSISubsetterInput(GeoEDFPlugin):
         
     # get the extents of the HUC12 watershed given a HUC12 ID
     def get_huc12_extent(self):
+
         try:
-            gethucbbox_url = "https://subset.cuahsi.org/wbd/gethucbbox/lcc?hucID={}".format(self.huc12_id)
+            str_huc12_id = ','.join([str(i) for i in self.huc12_id])
+            gethucbbox_url = "https://subset.cuahsi.org/wbd/gethucbbox/lcc?hucID={}".format(str_huc12_id)
+
             res = requests.get(gethucbbox_url)
             res.raise_for_status()
             gethubbox_res_json = res.json()
+
             return gethubbox_res_json["bbox"]        
         except:
             raise GeoEDFError('Error occurred in retrieving bounds for given HUC12 ID: %s' % self.huc12_id)
@@ -68,7 +72,11 @@ class CUAHSISubsetterInput(GeoEDFPlugin):
             west, south, east, north = self.get_huc12_extent()
             
             # next run the subsetter for these extents
-            submit_url = f'https://subset.cuahsi.org/nwm/v2_0/subset?llat={south}&llon={west}&ulat={north}&ulon={east}&hucs=[]'
+            submit_url = f'https://subset.cuahsi.org/nwm/v2_0/subset?' + \
+                         f'llat={south}&llon={west}&ulat={north}&ulon={east}&' + \
+                         f'hucs={",".join([str(i) for i in self.huc12_id])}'
+            
+
             res = requests.get(submit_url)
             res.raise_for_status()
 
