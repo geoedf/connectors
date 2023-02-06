@@ -95,7 +95,7 @@ jobs:
 
                 if [ -f "${OUTPUT_CONTAINER}" ]; then
                   echo "library://geoedfproject/connectors/$folder:latest"
-                  singularity push -U ${OUTPUT_CONTAINER} library://geoedf/connectors/$folder:latest
+                  singularity push -U ${OUTPUT_CONTAINER} library://geoedfproject/connectors/$folder:latest
                 else
                   echo "Container build failed."
                 fi
