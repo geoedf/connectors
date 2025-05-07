@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='pathfilter',
-      version='0.3',
+      version='0.4',
       description='Filter for producing filenames based on string patterns',
       url='http://github.com/geoedf/pathfilter',
       author='Rajesh Kalyanam',
