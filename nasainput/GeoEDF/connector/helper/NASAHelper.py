@@ -85,31 +85,73 @@ def getFileList(url, auth):
                 files = parser.pathList
 
                 result = []
+                
+                # Check if this is an OpenDAP server by looking at URL pattern
+                is_opendap = 'opendap' in base_url.lower()
+                
                 for filename in files:
                     # some filenames may be an absolute or relative path
                     if '/' in filename:
                         actual_filename = os.path.basename(filename)
                     else:
                         actual_filename = filename
-                    if fnmatch.fnmatch(actual_filename,filename_pattern):
-                        # if path leads with a /, we need to revise the url, else can just append
-                        if filename.startswith('/'):
-                            # get the URL prefix
-                            if base_url.startswith('https://'):
-                                skip = 8 # number of characters to skip in prefix
-                            elif base_url.startswith('http://'):
-                                skip = 7
-                            else:
-                                skip = 0
+                    
+                    # For OpenDAP servers, match against base .hdf files
+                    if is_opendap:
+                        # Extract the base pattern (remove .dap.nc4 if present)
+                        base_pattern = filename_pattern
+                        if base_pattern.endswith('.dap.nc4'):
+                            base_pattern = base_pattern[:-8]  # Remove .dap.nc4
+                        
+                        # Match against .hdf files only
+                        if actual_filename.endswith('.hdf') and fnmatch.fnmatch(actual_filename, base_pattern):
+                            # Construct download URL by appending .dap.nc4
+                            download_filename = actual_filename + '.dap.nc4'
+                            
+                            # if path leads with a /, we need to revise the url, else can just append
+                            if filename.startswith('/'):
+                                # get the URL prefix
+                                if base_url.startswith('https://'):
+                                    skip = 8 # number of characters to skip in prefix
+                                elif base_url.startswith('http://'):
+                                    skip = 7
+                                else:
+                                    skip = 0
 
-                            next_slash = base_url.find('/',skip)
-                            if next_slash != -1:
-                                url_prefix = base_url[:next_slash]
+                                next_slash = base_url.find('/',skip)
+                                if next_slash != -1:
+                                    url_prefix = base_url[:next_slash]
+                                else:
+                                    url_prefix = base_url
+                                # Use the directory path from filename but with download_filename
+                                file_dir = os.path.dirname(filename)
+                                if file_dir:
+                                    result.append('%s%s/%s' % (url_prefix, file_dir, download_filename))
+                                else:
+                                    result.append('%s/%s' % (url_prefix, download_filename))
                             else:
-                                url_prefix = base_url
-                            result.append('%s%s' % (url_prefix,filename))
-                        else:
-                            result.append('%s/%s' % (base_url,filename))
+                                result.append('%s/%s' % (base_url, download_filename))
+                    else:
+                        # For non-OpenDAP servers, use original logic
+                        if fnmatch.fnmatch(actual_filename, filename_pattern):
+                            # if path leads with a /, we need to revise the url, else can just append
+                            if filename.startswith('/'):
+                                # get the URL prefix
+                                if base_url.startswith('https://'):
+                                    skip = 8 # number of characters to skip in prefix
+                                elif base_url.startswith('http://'):
+                                    skip = 7
+                                else:
+                                    skip = 0
+
+                                next_slash = base_url.find('/',skip)
+                                if next_slash != -1:
+                                    url_prefix = base_url[:next_slash]
+                                else:
+                                    url_prefix = base_url
+                                result.append('%s%s' % (url_prefix,filename))
+                            else:
+                                result.append('%s/%s' % (base_url,filename))
                 return result
             except requests.exceptions.HTTPError:
                 raise GeoEDFError('Error accessing file listing at URL')
@@ -118,7 +160,14 @@ def getFileList(url, auth):
         else:
             raise GeoEDFError('URL does not point to a file or set of files')
     else:
-        return [url]
+        # For single file URLs, check if this is an OpenDAP server
+        # and if the URL needs .dap.nc4 extension for data access
+        if 'opendap' in url.lower() and url.endswith('.hdf'):
+            # For OpenDAP servers, append .dap.nc4 to .hdf files for data access
+            return [url + '.dap.nc4']
+        else:
+            # For non-OpenDAP servers or URLs already with proper extension
+            return [url]
 
 
 def getFile(url, auth=None, path=None): 
@@ -162,7 +211,7 @@ def getFile(url, auth=None, path=None):
                                 outFile.write(chunk)
                     return True
                 else: # no wildcard
-                    res = session.get(url)
+                    res = session.get(url,stream=True)
                     res.raise_for_status()
 
                     # get the name of the file to save
