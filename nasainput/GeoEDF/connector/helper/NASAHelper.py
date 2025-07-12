@@ -194,33 +194,23 @@ def getFile(url, auth=None, path=None):
             
             if validateAuth(auth): # auth validated for completeness
                 session = SessionWithHeaderRedirection(auth['user'], auth['password'])
-                # if there is a wildcard in the URL, we need to process a list of files instead
-                if '*' in url:
-                    fileURLList = getFileList(url,auth)
-                    # recreate session object since file listing may not need auth
-                    session = SessionWithHeaderRedirection(auth['user'], auth['password'])
-                    for fileURL in fileURLList:
-                        res = session.get(fileURL,stream=True)
-                        res.raise_for_status()
-                        
-                        # get the name of the file to save
-                        outFilename = getFilename(res,fileURL)
-                        outPath = '%s/%s' % (path,outFilename.strip('"'))
-                        with open(outPath,'wb') as outFile:
-                            for chunk in res.iter_content(chunk_size=1024*1024):
-                                outFile.write(chunk)
-                    return True
-                else: # no wildcard
-                    res = session.get(url,stream=True)
+                
+                # Always use getFileList to get properly formatted URLs (handles both wildcard and single file cases)
+                fileURLList = getFileList(url,auth)
+                
+                # recreate session object since file listing may not need auth
+                session = SessionWithHeaderRedirection(auth['user'], auth['password'])
+                for fileURL in fileURLList:
+                    res = session.get(fileURL,stream=True)
                     res.raise_for_status()
-
+                    
                     # get the name of the file to save
-                    outFilename = getFilename(res,url)
+                    outFilename = getFilename(res,fileURL)
                     outPath = '%s/%s' % (path,outFilename.strip('"'))
                     with open(outPath,'wb') as outFile:
                         for chunk in res.iter_content(chunk_size=1024*1024):
                             outFile.write(chunk)
-                    return True
+                return True
 
             else: # auth could not be validated
                 raise GeoEDFError('Invalid authentication provided!')

@@ -128,5 +128,31 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# Test and debug files created during development
+test_*.py
+debug_*.py
+*_test.py
+*_debug.py
+
+# Specific test files for NASA Input connector debugging
+test_nasa_download.py
+test_simple_nasa.py
+test_stream_parameter.py
+test_wildcard_nasa.py
+test_wildcard_pattern.py
+test_wildcard_final.py
+test_final_wildcard.py
+test_url_construction.py
+test_complete_wildcard.py
+test_nasa_input_final.py
+test_debug_nasa.py
+test_exact_flow.py
+test_fix_verification.py
+test_complete_flow.py
+test_single_file_fix.py
+test_url_logic.py
+test_html_fix.py
+debug_viewer_url.py
+
 # Emacs temp files
 *.*~

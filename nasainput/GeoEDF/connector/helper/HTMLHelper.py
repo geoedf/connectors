@@ -26,6 +26,9 @@ class HTMLHelper(HTMLParser):
                     # some simple filtering to skip spurious hrefs
                     if self.link in value or self.indexcol in value:
                         break
+                    # Skip OpenDAP viewer URLs
+                    elif 'viewers/viewers' in value:
+                        break
                     else:
                         self.inLink = True
                         self.lasttag = tag
