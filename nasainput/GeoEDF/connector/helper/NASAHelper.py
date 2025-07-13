@@ -158,10 +158,16 @@ def getFileList(url, auth):
                             else:
                                 result.append('%s/%s' % (base_url,filename))
                 return result
-            except requests.exceptions.HTTPError:
-                raise GeoEDFError('Error accessing file listing at URL')
-            except:
-                raise
+            except requests.exceptions.HTTPError as e:
+                # Handle missing date directories gracefully (common in satellite data)
+                if hasattr(e.response, 'status_code') and e.response.status_code == 404:
+                    # 404 means the date directory doesn't exist - return empty list
+                    return []
+                else:
+                    # Other HTTP errors are genuine problems
+                    raise GeoEDFError(f'Error accessing file listing at URL: {e}')
+            except Exception as e:
+                raise GeoEDFError(f'Unexpected error during file listing: {e}')
         else:
             raise GeoEDFError('URL does not point to a file or set of files')
     else:
@@ -203,18 +209,39 @@ def getFile(url, auth=None, path=None):
                 # Always use getFileList to get properly formatted URLs (handles both wildcard and single file cases)
                 fileURLList = getFileList(url,auth)
                 
+                # Handle cases where no files are found (e.g., missing date directories)
+                if not fileURLList:
+                    # No files found - this is normal for satellite data with gaps
+                    # Return True to indicate successful processing (even though no files downloaded)
+                    return True
+                
                 # recreate session object since file listing may not need auth
                 session = SessionWithHeaderRedirection(auth['user'], auth['password'])
+                downloaded_count = 0
+                
                 for fileURL in fileURLList:
-                    res = session.get(fileURL,stream=True)
-                    res.raise_for_status()
-                    
-                    # get the name of the file to save
-                    outFilename = getFilename(res,fileURL)
-                    outPath = '%s/%s' % (path,outFilename.strip('"'))
-                    with open(outPath,'wb') as outFile:
-                        for chunk in res.iter_content(chunk_size=1024*1024):
-                            outFile.write(chunk)
+                    try:
+                        res = session.get(fileURL,stream=True)
+                        res.raise_for_status()
+                        
+                        # get the name of the file to save
+                        outFilename = getFilename(res,fileURL)
+                        outPath = '%s/%s' % (path,outFilename.strip('"'))
+                        with open(outPath,'wb') as outFile:
+                            for chunk in res.iter_content(chunk_size=1024*1024):
+                                outFile.write(chunk)
+                        downloaded_count += 1
+                        
+                    except requests.exceptions.HTTPError as e:
+                        # Handle individual file download errors gracefully
+                        if hasattr(e.response, 'status_code') and e.response.status_code == 404:
+                            # File not found - skip this file but continue with others
+                            continue
+                        else:
+                            # Other HTTP errors should be raised
+                            raise e
+                
+                # Return True if we successfully processed the request (even if no files downloaded)
                 return True
 
             else: # auth could not be validated
