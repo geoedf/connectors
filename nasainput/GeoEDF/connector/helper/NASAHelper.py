@@ -82,37 +82,6 @@ def getFileList(url, auth):
                 # Check if this is an OpenDAP server by looking at URL pattern
                 is_opendap = 'opendap' in base_url.lower()
                 
-                if is_opendap:
-                    # For OpenDAP servers, individual .hdf files are typically aggregated
-                    # into time-series .ncml files. Try to find the appropriate aggregated file
-                    # by extracting the tile (h##v##) from the pattern
-                    
-                    # Extract tile pattern from filename (e.g., h10v04 from MOD13Q1.A2023*.h10v04.061.*.hdf)
-                    tile_match = re.search(r'h\d{2}v\d{2}', filename_pattern)
-                    if tile_match:
-                        tile = tile_match.group()
-                        # Check if aggregated file exists
-                        aggregated_url = f"{base_url}/{tile}.ncml"
-                        
-                        # Test if the aggregated file exists
-                        try:
-                            agg_res = session.head(aggregated_url)
-                            if agg_res.status_code in [200, 401, 405]:  # 401 means exists but needs auth, 405 means HEAD not allowed
-                                # Return the aggregated file URL with .dap.nc4 extension for data access
-                                return [f"{aggregated_url}.dap.nc4"]
-                        except Exception:
-                            # If HEAD fails, try a quick GET request to check existence
-                            try:
-                                agg_res = session.get(aggregated_url, timeout=10, stream=True)
-                                if agg_res.status_code in [200, 401]:
-                                    return [f"{aggregated_url}.dap.nc4"]
-                            except Exception:
-                                pass  # Fall through to original logic if aggregated file doesn't exist
-                    
-                    # Fall back to original individual file logic if aggregated approach fails
-                    pass
-                
-                # Original logic for individual file discovery
                 # parse the returned HTML to get a possible file listing
                 parser = HTMLHelper()
                 parser.feed(res.text)
@@ -127,41 +96,46 @@ def getFileList(url, auth):
                     else:
                         actual_filename = filename
                     
-                    # For OpenDAP servers, match against base .hdf files
+                    # For OpenDAP servers, look for .hdf.dap files (not raw .hdf)
                     if is_opendap:
-                        # Extract the base pattern (remove .dap.nc4 if present)
-                        base_pattern = filename_pattern
-                        if base_pattern.endswith('.dap.nc4'):
-                            base_pattern = base_pattern[:-8]  # Remove .dap.nc4
-                        
-                        # Match against .hdf files only
-                        if actual_filename.endswith('.hdf') and fnmatch.fnmatch(actual_filename, base_pattern):
-                            # Construct download URL by appending .dap.nc4
-                            download_filename = actual_filename + '.dap.nc4'
+                        # OpenDAP servers expose service endpoints like .hdf.dap, not raw .hdf files
+                        # Look for .hdf.dap files and extract the base HDF filename for pattern matching
+                        if actual_filename.endswith('.hdf.dap'):
+                            # Extract base HDF filename (remove .dap suffix)
+                            base_hdf_name = actual_filename[:-4]  # Remove .dap to get .hdf file
                             
-                            # if path leads with a /, we need to revise the url, else can just append
-                            if filename.startswith('/'):
-                                # get the URL prefix
-                                if base_url.startswith('https://'):
-                                    skip = 8 # number of characters to skip in prefix
-                                elif base_url.startswith('http://'):
-                                    skip = 7
-                                else:
-                                    skip = 0
+                            # Match the base HDF filename against the pattern
+                            base_pattern = filename_pattern
+                            if base_pattern.endswith('.dap.nc4'):
+                                base_pattern = base_pattern[:-8]  # Remove .dap.nc4 to get .hdf pattern
+                            
+                            if fnmatch.fnmatch(base_hdf_name, base_pattern):
+                                # For data download, use .dap.nc4 extension
+                                download_filename = base_hdf_name + '.dap.nc4'
+                                
+                                # if path leads with a /, we need to revise the url, else can just append
+                                if filename.startswith('/'):
+                                    # get the URL prefix
+                                    if base_url.startswith('https://'):
+                                        skip = 8 # number of characters to skip in prefix
+                                    elif base_url.startswith('http://'):
+                                        skip = 7
+                                    else:
+                                        skip = 0
 
-                                next_slash = base_url.find('/',skip)
-                                if next_slash != -1:
-                                    url_prefix = base_url[:next_slash]
+                                    next_slash = base_url.find('/',skip)
+                                    if next_slash != -1:
+                                        url_prefix = base_url[:next_slash]
+                                    else:
+                                        url_prefix = base_url
+                                    # Use the directory path from filename but with download_filename
+                                    file_dir = os.path.dirname(filename)
+                                    if file_dir:
+                                        result.append('%s%s/%s' % (url_prefix, file_dir, download_filename))
+                                    else:
+                                        result.append('%s/%s' % (url_prefix, download_filename))
                                 else:
-                                    url_prefix = base_url
-                                # Use the directory path from filename but with download_filename
-                                file_dir = os.path.dirname(filename)
-                                if file_dir:
-                                    result.append('%s%s/%s' % (url_prefix, file_dir, download_filename))
-                                else:
-                                    result.append('%s/%s' % (url_prefix, download_filename))
-                            else:
-                                result.append('%s/%s' % (base_url, download_filename))
+                                    result.append('%s/%s' % (base_url, download_filename))
                     else:
                         # For non-OpenDAP servers, use original logic
                         if fnmatch.fnmatch(actual_filename, filename_pattern):
