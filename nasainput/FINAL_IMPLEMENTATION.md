@@ -39,6 +39,35 @@ Match: Against pattern MCD15A3H.A*.h09v07.*.hdf
 Result: 1 match → URL: .../MCD15A3H.A2002197.h09v07.061.2020077144157.hdf.dap.nc4
 ```
 
+### 2. Missing Date Handling ✅ SOLVED 
+**Problem**: When processing date ranges (e.g., 07/16/2002 to 07/23/2002), the connector would fail with errors when certain dates had no data available, stopping the entire download process.
+
+**Root Cause**: Satellite data often has gaps where no data was collected or processed for specific dates. When the connector tried to access a missing date directory (e.g., `2002.07.22`), the server returned HTTP 404, which was treated as a fatal error.
+
+**Solution**: Enhanced error handling in both `getFileList()` and `getFile()`:
+
+```python
+# In getFileList() - handle missing date directories
+except requests.exceptions.HTTPError as e:
+    if hasattr(e.response, 'status_code') and e.response.status_code == 404:
+        # 404 means the date directory doesn't exist - return empty list
+        return []
+    else:
+        # Other HTTP errors are genuine problems
+        raise GeoEDFError(f'Error accessing file listing at URL: {e}')
+
+# In getFile() - handle empty file lists gracefully  
+if not fileURLList:
+    # No files found - this is normal for satellite data with gaps
+    return True  # Continue processing other dates
+```
+
+**Result**: The connector now processes date ranges gracefully:
+- **2002.07.16**: ✅ Downloads available files
+- **2002.07.22**: ✅ Skips missing date (no error)  
+- **2002.07.23**: ✅ Skips missing date (no error)
+- **2002.07.24**: ✅ Downloads available files (if any)
+
 ## Key Changes Made
 
 ### 1. Enhanced `getFileList()` function in NASAHelper.py
@@ -152,6 +181,37 @@ connector.url = "https://opendap.cr.usgs.gov/opendap/hyrax/DP131/MOTA/MCD15A3H.0
 # Result: 1 file downloaded (was 0 before the fix)
 ```
 
+### Date Range Downloads with Missing Dates
+
+**YAML Configuration Example:**
+```yaml
+$1:
+  Input:
+    NASAInput:
+      url: https://opendap.cr.usgs.gov/opendap/hyrax/DP131/MOTA/MCD15A3H.061/%{filename}
+      user: your_username
+      password: your_password
+  Filter:
+    filename:
+      PathFilter:
+        pattern: '%{dtstring}/MCD15A3H.*.h09v07*.hdf'
+    dtstring:
+      DateTimeFilter:
+        pattern: '%Y.%m.%d'
+        start: 07/16/2002
+        end: 07/23/2002
+        period: D
+        exact_dates: True
+```
+
+**NEW Behavior (Fixed):**
+- **2002.07.16**: ✅ Processes normally (directory exists)
+- **2002.07.17**: ✅ Processes normally (directory exists) 
+- **2002.07.22**: ✅ **SKIPS gracefully** (directory missing, no error)
+- **2002.07.23**: ✅ **SKIPS gracefully** (directory missing, no error)
+
+**Result**: Downloads complete successfully for available dates, missing dates don't cause failures.
+
 ## Verification Results
 
 ### ✅ **Single File URL Transformation**
@@ -261,3 +321,16 @@ If you encounter viewer URL errors with `/viewers/viewers` in the URL, try:
 ✅ **Input**: `https://opendap.cr.usgs.gov/.../file.hdf`  
 ✅ **Output**: `https://opendap.cr.usgs.gov/.../file.hdf.dap.nc4`  
 ❌ **Never**: URLs containing `/viewers/viewers`
+
+## Limitations and Enhancements
+
+### Missing Date Handling 
+**Enhancement**: The connector now gracefully handles missing dates in satellite data.
+
+**Details**:
+- ✅ HTTP 404 errors for missing date directories are handled gracefully
+- ✅ Returns empty results instead of failing the entire process
+- ✅ Continues processing remaining dates in the range
+- ✅ Individual file 404 errors are also skipped without stopping downloads
+
+**Use Case**: Perfect for processing date ranges where some days may have no satellite coverage or data processing gaps.
