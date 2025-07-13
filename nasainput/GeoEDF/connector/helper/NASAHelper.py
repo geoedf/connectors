@@ -79,15 +79,46 @@ def getFileList(url, auth):
 
                 res.raise_for_status()
 
+                # Check if this is an OpenDAP server by looking at URL pattern
+                is_opendap = 'opendap' in base_url.lower()
+                
+                if is_opendap:
+                    # For OpenDAP servers, individual .hdf files are typically aggregated
+                    # into time-series .ncml files. Try to find the appropriate aggregated file
+                    # by extracting the tile (h##v##) from the pattern
+                    
+                    # Extract tile pattern from filename (e.g., h10v04 from MOD13Q1.A2023*.h10v04.061.*.hdf)
+                    tile_match = re.search(r'h\d{2}v\d{2}', filename_pattern)
+                    if tile_match:
+                        tile = tile_match.group()
+                        # Check if aggregated file exists
+                        aggregated_url = f"{base_url}/{tile}.ncml"
+                        
+                        # Test if the aggregated file exists
+                        try:
+                            agg_res = session.head(aggregated_url)
+                            if agg_res.status_code in [200, 401, 405]:  # 401 means exists but needs auth, 405 means HEAD not allowed
+                                # Return the aggregated file URL with .dap.nc4 extension for data access
+                                return [f"{aggregated_url}.dap.nc4"]
+                        except Exception:
+                            # If HEAD fails, try a quick GET request to check existence
+                            try:
+                                agg_res = session.get(aggregated_url, timeout=10, stream=True)
+                                if agg_res.status_code in [200, 401]:
+                                    return [f"{aggregated_url}.dap.nc4"]
+                            except Exception:
+                                pass  # Fall through to original logic if aggregated file doesn't exist
+                    
+                    # Fall back to original individual file logic if aggregated approach fails
+                    pass
+                
+                # Original logic for individual file discovery
                 # parse the returned HTML to get a possible file listing
                 parser = HTMLHelper()
                 parser.feed(res.text)
                 files = parser.pathList
 
                 result = []
-                
-                # Check if this is an OpenDAP server by looking at URL pattern
-                is_opendap = 'opendap' in base_url.lower()
                 
                 for filename in files:
                     # some filenames may be an absolute or relative path

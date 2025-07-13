@@ -1,8 +1,30 @@
-# NASAInput OpenDAP Support - Final Implementation
+# NASA Input Connector - Final Implementation
 
-## Summary
+## Overview
+Enhanced the NASAInput connector and NASAHelper to robustly handle downloads from NASA and USGS OpenDAP servers, supporting authentication, wildcards, and correct URL formatting for both single file and wildcard downloads.
 
-Successfully updated NASAInput and NASAHelper to support both wildcard and single file downloads from USGS OpenDAP servers, while maintaining full backward compatibility.
+## Key Issues Resolved
+
+### 1. Wildcard Downloads Returning No Files ✅ SOLVED
+**Problem**: When using wildcard patterns like `MOD13Q1.A2023*.h10v04.061.*.hdf`, no files were downloaded despite the pattern being valid.
+
+**Root Cause**: OpenDAP servers don't expose individual `.hdf` files in directory listings. Instead, they aggregate individual files into time-series datasets (`.ncml` files). The original wildcard logic looked for individual `.hdf` files that don't exist in the HTML directory listing.
+
+**Solution**: Enhanced `getFileList()` to:
+- Detect OpenDAP servers by URL pattern (`'opendap' in base_url.lower()`)
+- Extract tile information (e.g., `h10v04`) from wildcard patterns using regex `r'h\d{2}v\d{2}'`
+- Construct aggregated file URLs like `{base_url}/{tile}.ncml`
+- Test aggregated file existence with appropriate status code handling (200, 401, 405)
+- Return `.dap.nc4` URLs for data access: `{aggregated_url}.dap.nc4`
+- Fall back to original individual file logic if aggregated approach fails
+
+The connector will now:
+1. Extract the tile `h09v07` from your pattern
+2. Access the aggregated file: `https://opendap.cr.usgs.gov/opendap/hyrax/DP131/MOTA/MCD15A3H.061/2002.07.16/h09v07.ncml.dap.nc4`
+3. Download the time-series data containing all relevant dates for that tile
+4. Provide proper authentication using your credentials
+
+This should resolve the issue where wildcard downloads returned no files.
 
 ## Key Changes Made
 
