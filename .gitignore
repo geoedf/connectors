@@ -154,5 +154,13 @@ test_url_logic.py
 test_html_fix.py
 debug_viewer_url.py
 
+# Analysis and debug scripts
+analyze_*.py
+examine_*.py
+explore_opendap*.py
+verify_fix.py
+debug_*.py
+test_*.py
+
 # Emacs temp files
 *.*~
