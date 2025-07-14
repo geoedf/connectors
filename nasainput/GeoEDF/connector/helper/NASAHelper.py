@@ -240,17 +240,17 @@ def getFile(url, auth=None, path=None):
                             # OAuth redirect detected - handle automatically
                             oauth_url = res.headers.get('Location')
                             if oauth_url and 'oauth/authorize' in oauth_url:
-                                print(f"🔐 OAuth redirect detected for: {fileURL}")
-                                print("🤖 Attempting automated OAuth authentication...")
+                                print(f"[OAuth] OAuth redirect detected for: {fileURL}")
+                                print("[OAuth] Attempting automated OAuth authentication...")
                                 
                                 # Try automated OAuth authentication
                                 oauth_response = handle_oauth_authentication(session, oauth_url, auth)
                                 
                                 if oauth_response and oauth_response.status_code == 200:
-                                    print("✅ OAuth authentication successful!")
+                                    print("[OAuth] OAuth authentication successful!")
                                     res = oauth_response
                                 else:
-                                    print("❌ OAuth authentication failed - skipping file")
+                                    print("[OAuth] OAuth authentication failed - skipping file")
                                     continue
                             else:
                                 # Non-OAuth redirect - follow normally
@@ -279,7 +279,7 @@ def getFile(url, auth=None, path=None):
                 
                 # Return True if we successfully processed the request (even if no files downloaded)  
                 if downloaded_count > 0:
-                    print(f"✅ Successfully downloaded {downloaded_count} file(s)")
+                    print(f"[Success] Successfully downloaded {downloaded_count} file(s)")
                 else:
                     print(f"ℹ️  Processed {len(fileURLList)} file(s) - check output above for OAuth URLs if needed")
                     
