@@ -218,6 +218,19 @@ def getFile(url, auth=None, path=None):
             if validateAuth(auth): # auth validated for completeness
                 session = SessionWithHeaderRedirection(auth['user'], auth['password'])
                 
+                # Pre-authenticate with EarthData for USGS OpenDAP servers
+                if 'usgs.gov' in url.lower() and 'opendap' in url.lower():
+                    print("[Info] Pre-authenticating with EarthData for USGS OpenDAP access...")
+                    try:
+                        # Establish EarthData session first
+                        earthdata_test = session.get("https://urs.earthdata.nasa.gov/profile", timeout=10)
+                        if earthdata_test.status_code == 200:
+                            print("[Info] EarthData session established successfully")
+                        else:
+                            print(f"[Warning] EarthData pre-authentication returned: {earthdata_test.status_code}")
+                    except Exception as e:
+                        print(f"[Warning] EarthData pre-authentication failed: {e}")
+                
                 # Always use getFileList to get properly formatted URLs (handles both wildcard and single file cases)
                 fileURLList = getFileList(url,auth)
                 
@@ -251,10 +264,38 @@ def getFile(url, auth=None, path=None):
                                     res = oauth_response
                                 else:
                                     print("[OAuth] OAuth authentication failed")
-                                    print(f"[OAuth] Manual download required: {oauth_url}")
-                                    print(f"[OAuth] Original file URL: {fileURL}")
-                                    print("[OAuth] Please download manually using browser with EarthData login")
-                                    continue
+                                    
+                                    # Try alternative approach: Use the original session with cookies
+                                    print("[OAuth] Trying alternative session-based approach...")
+                                    
+                                    # Sometimes the OAuth process sets cookies that can be used
+                                    # Try the original URL again with the current session
+                                    alt_response = session.get(fileURL, allow_redirects=True, stream=True, timeout=60)
+                                    
+                                    if alt_response.status_code == 200:
+                                        content_type = alt_response.headers.get('Content-Type', '')
+                                        content_length = int(alt_response.headers.get('Content-Length', 0))
+                                        
+                                        # Check if this looks like actual data (not an HTML page)
+                                        if (content_length > 1000000 or
+                                            'application/octet-stream' in content_type or 
+                                            'application/x-hdf' in content_type or
+                                            'application/netcdf' in content_type or
+                                            'binary' in content_type):
+                                            print("[OAuth] Alternative session approach successful!")
+                                            res = alt_response
+                                        else:
+                                            # Still not working - skip this file
+                                            print(f"[OAuth] Manual download required: {oauth_url}")
+                                            print(f"[OAuth] Original file URL: {fileURL}")
+                                            print("[OAuth] Please download manually using browser with EarthData login")
+                                            continue
+                                    else:
+                                        # Alternative approach also failed
+                                        print(f"[OAuth] Manual download required: {oauth_url}")
+                                        print(f"[OAuth] Original file URL: {fileURL}")
+                                        print("[OAuth] Please download manually using browser with EarthData login")
+                                        continue
                             else:
                                 # Non-OAuth redirect - follow normally
                                 res = session.get(fileURL, stream=True)
@@ -309,75 +350,231 @@ def handle_oauth_authentication(session, oauth_url, auth):
         Response object if successful, None if failed
     """
     try:
-        # Method 1: Create a new session and try to authenticate with EarthData
-        print("   Trying EarthData login with OAuth redirect...")
-        
-        # Create a fresh session for OAuth handling
-        oauth_session = SessionWithHeaderRedirection(auth['user'], auth['password'])
-        
-        # First, establish session with EarthData by accessing the OAuth URL
-        response = oauth_session.get(oauth_url, allow_redirects=True, timeout=30)
-        
-        # Check if we got redirected back to the original data URL
-        if response.status_code == 200:
-            final_url = response.url
-            content_type = response.headers.get('Content-Type', '')
-            content_length = len(response.content) if hasattr(response, 'content') else 0
-            
-            print(f"   Final URL after OAuth: {final_url}")
-            print(f"   Content-Type: {content_type}")
-            print(f"   Content-Length: {content_length}")
-            
-            # Check if this looks like actual data
-            if (content_length > 1000000 or  # Large file
-                'application/octet-stream' in content_type or 
-                'application/x-hdf' in content_type or
-                'application/netcdf' in content_type or
-                'dap' in final_url.lower()):  # OpenDAP data
-                return response
-        
-        # Method 2: If OAuth redirect didn't work, try direct authentication to original server
-        print("   Trying direct server authentication...")
-        
-        # Parse the OAuth URL to extract the original URL from state parameter
         from urllib.parse import urlparse, parse_qs
         import base64
         
+        # Extract the original data URL from the OAuth state parameter
         parsed_url = urlparse(oauth_url)
         params = parse_qs(parsed_url.query)
         state_param = params.get('state', [None])[0]
         
+        original_data_url = None
         if state_param:
             try:
                 # Add padding if needed for base64 decoding
                 state_padded = state_param + '=' * (4 - len(state_param) % 4)
-                decoded_state = base64.b64decode(state_padded).decode('utf-8')
-                print(f"   Decoded original URL: {decoded_state}")
-                
-                # If the decoded URL is the same as what we started with, 
-                # the issue is authentication, not URL format
-                if decoded_state != oauth_url:
-                    # Try a direct request to the original data URL with authenticated session
-                    print("   Trying direct access to original URL with authenticated session...")
-                    response = oauth_session.get(decoded_state, allow_redirects=False, timeout=30)
-                    
-                    if response.status_code == 200:
-                        content_type = response.headers.get('Content-Type', '')
-                        if ('application/octet-stream' in content_type or 
-                            'application/x-hdf' in content_type or
-                            'application/netcdf' in content_type or
-                            len(response.content) > 1000000):
-                            return response
-                    elif response.status_code == 302:
-                        print("   Still getting redirected - OAuth credentials may be invalid")
-                        
+                original_data_url = base64.b64decode(state_padded).decode('utf-8')
+                print(f"   Decoded original URL: {original_data_url}")
             except Exception as e:
                 print(f"   Could not decode state parameter: {e}")
+                return None
+        
+        # Method 1: Complete OAuth flow programmatically
+        print("   Attempting programmatic OAuth flow...")
+        
+        oauth_session = SessionWithHeaderRedirection(auth['user'], auth['password'])
+        
+        # Step 1: Pre-authenticate with EarthData to establish session
+        try:
+            earthdata_login = "https://urs.earthdata.nasa.gov/login"
+            login_response = oauth_session.get(earthdata_login, timeout=30)
+            if login_response.status_code == 200:
+                print("   EarthData session pre-established")
+        except Exception as e:
+            print(f"   EarthData pre-auth warning: {e}")
+        
+        # Step 2: Try the OAuth URL with established session
+        auth_response = oauth_session.get(oauth_url, allow_redirects=True, timeout=30)
+        
+        if auth_response.status_code == 200:
+            # Check if we were redirected back to data (OAuth completed automatically)
+            if original_data_url and original_data_url in auth_response.url:
+                content_type = auth_response.headers.get('Content-Type', '')
+                content_length = len(auth_response.content) if hasattr(auth_response, 'content') else 0
+                
+                # Check if this looks like actual data
+                if (content_length > 1000000 or  # Large file
+                    'application/octet-stream' in content_type or 
+                    'application/x-hdf' in content_type or
+                    'application/netcdf' in content_type):
+                    print("   OAuth flow completed successfully!")
+                    return auth_response
+            
+            # If we're still at the OAuth page, try to handle it programmatically
+            # Check for common OAuth approval patterns in the response
+            response_text = auth_response.text.lower() if hasattr(auth_response, 'text') else ''
+            
+            if ('authorize' in response_text or 'approve' in response_text or 
+                'grant access' in response_text or 'allow' in response_text):
+                print("   Found OAuth authorization page - attempting approval...")
+                
+                # Try to find and submit authorization form automatically
+                try:
+                    import re
+                    
+                    # Look for approval/authorize forms with action URLs
+                    form_pattern = r'<form[^>]+action=["\']([^"\']*(?:authorize|approve|oauth)[^"\']*)["\'][^>]*>'
+                    forms = re.findall(form_pattern, auth_response.text, re.IGNORECASE)
+                    
+                    for action in forms:
+                        print(f"   Trying OAuth approval form: {action}")
+                        
+                        # Build form URL
+                        if action.startswith('/'):
+                            form_url = f"https://urs.earthdata.nasa.gov{action}"
+                        elif action.startswith('http'):
+                            form_url = action
+                        else:
+                            form_url = f"https://urs.earthdata.nasa.gov/{action}"
+                        
+                        # Extract hidden form fields and submit approval
+                        input_pattern = r'<input[^>]+name=["\']([^"\']+)["\'][^>]*(?:value=["\']([^"\']*)["\'])?[^>]*>'
+                        inputs = re.findall(input_pattern, auth_response.text, re.IGNORECASE)
+                        
+                        form_data = {}
+                        for name, value in inputs:
+                            if name and name.lower() not in ['username', 'password']:  # Skip login fields
+                                form_data[name] = value or ''
+                        
+                        # Add common approval parameters
+                        form_data.update({
+                            'approve': 'yes',
+                            'authorized': 'true',
+                            'allow': 'true'
+                        })
+                        
+                        approval_response = oauth_session.post(form_url, data=form_data, allow_redirects=True, timeout=30)
+                        
+                        if approval_response.status_code == 200 and original_data_url:
+                            # After approval, try accessing the original data URL
+                            final_response = oauth_session.get(original_data_url, allow_redirects=True, timeout=30)
+                            
+                            if final_response.status_code == 200:
+                                content_type = final_response.headers.get('Content-Type', '')
+                                content_length = len(final_response.content) if hasattr(final_response, 'content') else 0
+                                
+                                if (content_length > 1000000 or
+                                    'application/octet-stream' in content_type or 
+                                    'application/x-hdf' in content_type or
+                                    'application/netcdf' in content_type):
+                                    print("   OAuth approval successful!")
+                                    return final_response
+                
+                except Exception as e:
+                    print(f"   OAuth approval error: {e}")
+             # Step 2: Try to extract and submit any OAuth forms
+            try:
+                try:
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(auth_response.content, 'html.parser')
+                    
+                    # Look for OAuth authorization forms
+                    forms = soup.find_all('form')
+                    for form in forms:
+                        action = form.get('action', '')
+                        if 'authorize' in action or 'oauth' in action.lower():
+                            print("   Found OAuth authorization form, submitting...")
+                            
+                            # Build form data
+                            form_data = {}
+                            for input_tag in form.find_all('input'):
+                                name = input_tag.get('name')
+                                value = input_tag.get('value', '')
+                                if name:
+                                    form_data[name] = value
+                            
+                            # Submit the form
+                            form_url = action if action.startswith('http') else f"https://urs.earthdata.nasa.gov{action}"
+                            form_response = oauth_session.post(form_url, data=form_data, allow_redirects=True, timeout=30)
+                            
+                            if form_response.status_code == 200 and original_data_url:
+                                # Try to access the original data URL with the authenticated session
+                                data_response = oauth_session.get(original_data_url, allow_redirects=True, timeout=30)
+                                
+                                if data_response.status_code == 200:
+                                    content_type = data_response.headers.get('Content-Type', '')
+                                    content_length = len(data_response.content) if hasattr(data_response, 'content') else 0
+                                    
+                                    if (content_length > 1000000 or
+                                        'application/octet-stream' in content_type or 
+                                        'application/x-hdf' in content_type or
+                                        'application/netcdf' in content_type):
+                                        print("   OAuth form submission successful!")
+                                        return data_response
+                        
+                except ImportError:
+                    print("   BeautifulSoup not available - trying alternative form parsing...")
+                    
+                    # Alternative: Simple regex-based form extraction
+                    import re
+                    
+                    # Look for form action URLs
+                    form_pattern = r'<form[^>]+action=["\']([^"\']+)["\'][^>]*>'
+                    forms = re.findall(form_pattern, auth_response.text, re.IGNORECASE)
+                    
+                    for action in forms:
+                        if 'authorize' in action or 'oauth' in action.lower():
+                            print(f"   Found OAuth form action: {action}")
+                            
+                            # Extract all input fields from the form
+                            input_pattern = r'<input[^>]+name=["\']([^"\']+)["\'][^>]*(?:value=["\']([^"\']*)["\'])?[^>]*>'
+                            inputs = re.findall(input_pattern, auth_response.text, re.IGNORECASE)
+                            
+                            form_data = {}
+                            for name, value in inputs:
+                                if name:
+                                    form_data[name] = value or ''
+                            
+                            # Submit the form
+                            form_url = action if action.startswith('http') else f"https://urs.earthdata.nasa.gov{action}"
+                            form_response = oauth_session.post(form_url, data=form_data, allow_redirects=True, timeout=30)
+                            
+                            if form_response.status_code == 200 and original_data_url:
+                                # Try to access the original data URL with the authenticated session
+                                data_response = oauth_session.get(original_data_url, allow_redirects=True, timeout=30)
+                                
+                                if data_response.status_code == 200:
+                                    content_type = data_response.headers.get('Content-Type', '')
+                                    content_length = len(data_response.content) if hasattr(data_response, 'content') else 0
+                                    
+                                    if (content_length > 1000000 or
+                                        'application/octet-stream' in content_type or 
+                                        'application/x-hdf' in content_type or
+                                        'application/netcdf' in content_type):
+                                        print("   OAuth form submission successful!")
+                                        return data_response
+                        
+            except Exception as e:
+                print(f"   Form processing error: {e}")
+        
+        # Method 2: Try direct access with session cookies from EarthData login
+        print("   Trying direct access with EarthData session...")
+        
+        if original_data_url:
+            # First authenticate with EarthData directly
+            earthdata_login_url = "https://urs.earthdata.nasa.gov/login"
+            login_response = oauth_session.get(earthdata_login_url, timeout=30)
+            
+            if login_response.status_code == 200:
+                # Now try the original data URL with established session
+                data_response = oauth_session.get(original_data_url, allow_redirects=True, timeout=30)
+                
+                if data_response.status_code == 200:
+                    content_type = data_response.headers.get('Content-Type', '')
+                    content_length = len(data_response.content) if hasattr(data_response, 'content') else 0
+                    
+                    if (content_length > 1000000 or
+                        'application/octet-stream' in content_type or 
+                        'application/x-hdf' in content_type or
+                        'application/netcdf' in content_type):
+                        print("   Direct EarthData session access successful!")
+                        return data_response
+                    elif data_response.status_code != 302:  # Not a redirect
+                        print(f"   Got response but may not be data: {content_type}, {content_length} bytes")
         
         # Method 3: Log authentication status for debugging
         print("   Checking authentication status...")
         
-        # Try a simple authenticated request to EarthData to verify credentials
         try:
             auth_test_url = "https://urs.earthdata.nasa.gov/profile"
             auth_response = oauth_session.get(auth_test_url, timeout=10)
@@ -389,7 +586,7 @@ def handle_oauth_authentication(session, oauth_url, auth):
             print(f"   Could not verify EarthData credentials: {e}")
         
         print("   All OAuth authentication methods failed")
-        print("   Note: USGS OpenDAP OAuth may require interactive login or special token")
+        print("   Note: USGS OpenDAP OAuth may require interactive login or application tokens")
         return None
         
     except Exception as e:
