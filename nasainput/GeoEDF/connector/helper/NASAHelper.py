@@ -233,8 +233,32 @@ def getFile(url, auth=None, path=None):
                 
                 for fileURL in fileURLList:
                     try:
-                        res = session.get(fileURL,stream=True)
-                        res.raise_for_status()
+                        # Try direct download first
+                        res = session.get(fileURL, stream=True, allow_redirects=False)
+                        
+                        if res.status_code == 302:
+                            # OAuth redirect detected - handle automatically
+                            oauth_url = res.headers.get('Location')
+                            if oauth_url and 'oauth/authorize' in oauth_url:
+                                print(f"🔐 OAuth redirect detected for: {fileURL}")
+                                print("🤖 Attempting automated OAuth authentication...")
+                                
+                                # Try automated OAuth authentication
+                                oauth_response = handle_oauth_authentication(session, oauth_url, auth)
+                                
+                                if oauth_response and oauth_response.status_code == 200:
+                                    print("✅ OAuth authentication successful!")
+                                    res = oauth_response
+                                else:
+                                    print("❌ OAuth authentication failed - skipping file")
+                                    continue
+                            else:
+                                # Non-OAuth redirect - follow normally
+                                res = session.get(fileURL, stream=True)
+                        
+                        # For direct access (200) or successful OAuth, continue with download
+                        if res.status_code != 200:
+                            res.raise_for_status()
                         
                         # get the name of the file to save
                         outFilename = getFilename(res,fileURL)
@@ -253,7 +277,12 @@ def getFile(url, auth=None, path=None):
                             # Other HTTP errors should be raised
                             raise e
                 
-                # Return True if we successfully processed the request (even if no files downloaded)
+                # Return True if we successfully processed the request (even if no files downloaded)  
+                if downloaded_count > 0:
+                    print(f"✅ Successfully downloaded {downloaded_count} file(s)")
+                else:
+                    print(f"ℹ️  Processed {len(fileURLList)} file(s) - check output above for OAuth URLs if needed")
+                    
                 return True
 
             else: # auth could not be validated
@@ -263,5 +292,77 @@ def getFile(url, auth=None, path=None):
         raise
     except requests.exceptions.HTTPError:
         raise
-	    
+
+def handle_oauth_authentication(session, oauth_url, auth):
+    """
+    Handle OAuth authentication automatically using username/password
     
+    Args:
+        session: The requests session object
+        oauth_url: The OAuth authorization URL
+        auth: Dictionary with 'user' and 'password' keys
+        
+    Returns:
+        Response object if successful, None if failed
+    """
+    try:
+        # Method 1: Try direct access to OAuth URL with basic auth
+        print("   Trying OAuth URL with basic authentication...")
+        response = session.get(oauth_url, auth=(auth['user'], auth['password']), allow_redirects=True, timeout=30)
+        
+        if response.status_code == 200:
+            content_type = response.headers.get('Content-Type', '')
+            if ('application/octet-stream' in content_type or 
+                'application/x-hdf' in content_type or
+                len(response.content) > 1000000):  # Large content suggests data file
+                return response
+        
+        # Method 2: Try with session headers  
+        print("   Trying OAuth URL with session authentication...")
+        oauth_session = SessionWithHeaderRedirection(auth['user'], auth['password'])
+        response = oauth_session.get(oauth_url, allow_redirects=True, timeout=30)
+        
+        if response.status_code == 200:
+            content_type = response.headers.get('Content-Type', '')
+            if ('application/octet-stream' in content_type or 
+                'application/x-hdf' in content_type or
+                len(response.content) > 1000000):
+                return response
+        
+        # Method 3: Parse OAuth URL and try to extract the original URL from state parameter
+        print("   Trying to decode OAuth state parameter...")
+        from urllib.parse import urlparse, parse_qs
+        import base64
+        
+        parsed_url = urlparse(oauth_url)
+        params = parse_qs(parsed_url.query)
+        state_param = params.get('state', [None])[0]
+        
+        if state_param:
+            try:
+                # Add padding if needed for base64 decoding
+                state_padded = state_param + '=' * (4 - len(state_param) % 4)
+                decoded_state = base64.b64decode(state_padded).decode('utf-8')
+                print(f"   Decoded original URL: {decoded_state}")
+                
+                # Try accessing the original URL directly with authentication
+                response = oauth_session.get(decoded_state, allow_redirects=True, timeout=30)
+                
+                if response.status_code == 200:
+                    content_type = response.headers.get('Content-Type', '')
+                    if ('application/octet-stream' in content_type or 
+                        'application/x-hdf' in content_type or
+                        len(response.content) > 1000000):
+                        return response
+                        
+            except Exception as e:
+                print(f"   Could not decode state parameter: {e}")
+        
+        print("   All OAuth authentication methods failed")
+        return None
+        
+    except Exception as e:
+        print(f"   OAuth authentication error: {e}")
+        return None
+
+
