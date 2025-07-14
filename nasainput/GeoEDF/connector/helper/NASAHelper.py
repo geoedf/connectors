@@ -60,17 +60,18 @@ def getFilename(resp,url):
     else:
         filename = url.split("/")[-1]
     
-    # For OpenDAP .dap downloads, rename to standard .hdf extension
-    # Note: OpenDAP .dap content is typically NetCDF4 format, not HDF4
+    # For OpenDAP .dap downloads, use correct extension for NetCDF4/HDF5 format
     if filename.endswith('.hdf.dap'):
         content_type = resp.headers.get('Content-Type', '').lower()
         
-        # Remove .dap suffix to get standard .hdf filename
-        # IMPORTANT: The file content is actually NetCDF4 format, not HDF4,
-        # but we use .hdf extension for consistency with expected naming conventions
-        filename = filename[:-4]  # Remove .dap to get .hdf file
-        print(f"[Info] OpenDAP .dap file renamed to: {filename}")
-        print("[Info] Note: File content is NetCDF4 format, not HDF4")
+        # OpenDAP serves NetCDF4 format (which is HDF5-based), not HDF4
+        # Use .h5 extension to correctly represent the actual format
+        base_filename = filename[:-8]  # Remove .hdf.dap
+        filename = base_filename + '.h5'  # Use .h5 for HDF5/NetCDF4 format
+        
+        print(f"[Info] OpenDAP file renamed to: {filename}")
+        print("[Info] File format: NetCDF4 (HDF5-based) - using .h5 extension")
+        print("[Info] Note: Original .hdf.dap serves NetCDF4, not HDF4 format")
         print(f"[Info] Content-Type: {content_type}")
     
     return filename
