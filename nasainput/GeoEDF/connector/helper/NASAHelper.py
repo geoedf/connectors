@@ -73,14 +73,26 @@ def getFileList(url, auth):
         if '.' in poss_filename and '*' in poss_filename:
             filename_pattern = poss_filename
             try:
-                # get a listing of files from the base_url
-                session = SessionWithHeaderRedirection(auth['user'], auth['password'])
-                res = session.get(base_url)
-
-                res.raise_for_status()
-
                 # Check if this is an OpenDAP server by looking at URL pattern
                 is_opendap = 'opendap' in base_url.lower()
+                
+                # For OpenDAP servers, try unauthenticated directory listing first
+                # since directory listings are often publicly accessible
+                if is_opendap:
+                    try:
+                        import requests
+                        res = requests.get(base_url)
+                        res.raise_for_status()
+                    except requests.exceptions.HTTPError:
+                        # If unauthenticated fails, fall back to authenticated request
+                        session = SessionWithHeaderRedirection(auth['user'], auth['password'])
+                        res = session.get(base_url)
+                        res.raise_for_status()
+                else:
+                    # For non-OpenDAP servers, use authenticated request
+                    session = SessionWithHeaderRedirection(auth['user'], auth['password'])
+                    res = session.get(base_url)
+                    res.raise_for_status()
                 
                 # parse the returned HTML to get a possible file listing
                 parser = HTMLHelper()
@@ -106,12 +118,12 @@ def getFileList(url, auth):
                             
                             # Match the base HDF filename against the pattern
                             base_pattern = filename_pattern
-                            if base_pattern.endswith('.dap.nc4'):
-                                base_pattern = base_pattern[:-8]  # Remove .dap.nc4 to get .hdf pattern
+                            if base_pattern.endswith('.dap'):
+                                base_pattern = base_pattern[:-4]  # Remove .dap to get .hdf pattern
                             
                             if fnmatch.fnmatch(base_hdf_name, base_pattern):
-                                # For data download, use .dap.nc4 extension
-                                download_filename = base_hdf_name + '.dap.nc4'
+                                # For data download, use .dap extension (not .dap.nc4)
+                                download_filename = base_hdf_name + '.dap'
                                 
                                 # if path leads with a /, we need to revise the url, else can just append
                                 if filename.startswith('/'):
@@ -174,8 +186,8 @@ def getFileList(url, auth):
         # For single file URLs, check if this is an OpenDAP server
         # and if the URL needs .dap.nc4 extension for data access
         if 'opendap' in url.lower() and url.endswith('.hdf'):
-            # For OpenDAP servers, append .dap.nc4 to .hdf files for data access
-            return [url + '.dap.nc4']
+            # For OpenDAP servers, append .dap to .hdf files for data access
+            return [url + '.dap']
         else:
             # For non-OpenDAP servers or URLs already with proper extension
             return [url]

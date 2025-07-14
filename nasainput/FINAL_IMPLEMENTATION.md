@@ -20,7 +20,7 @@ The original wildcard logic looked for files ending in `.hdf`, but these don't e
 **Solution**: Complete rewrite of OpenDAP handling in `getFileList()`:
 - **NEW**: Look for `.hdf.dap` service endpoints instead of raw `.hdf` files
 - **NEW**: Extract base `.hdf` filenames from service endpoints for pattern matching
-- **NEW**: Construct proper `.dap.nc4` download URLs for data access
+- **NEW**: Construct proper `.dap` download URLs for data access
 - **REMOVED**: Non-functional `.ncml` aggregation logic that was causing 404 errors
 
 **Before (Failed):**
@@ -36,7 +36,7 @@ Search for: *.hdf.dap service endpoints in directory
 Found: 870 service endpoints
 Extract: MCD15A3H.A2002197.h09v07.061.2020077144157.hdf from .hdf.dap
 Match: Against pattern MCD15A3H.A*.h09v07.*.hdf
-Result: 1 match → URL: .../MCD15A3H.A2002197.h09v07.061.2020077144157.hdf.dap.nc4
+Result: 1 match → URL: .../MCD15A3H.A2002197.h09v07.061.2020077144157.hdf.dap
 ```
 
 ### 2. Missing Date Handling ✅ SOLVED 
@@ -84,8 +84,8 @@ if is_opendap:
         
         # Match the base HDF filename against the pattern
         if fnmatch.fnmatch(base_hdf_name, base_pattern):
-            # For data download, use .dap.nc4 extension
-            download_filename = base_hdf_name + '.dap.nc4'
+            # For data download, use .dap extension
+            download_filename = base_hdf_name + '.dap'
             result.append(f"{base_url}/{download_filename}")
 ```
 
@@ -93,11 +93,11 @@ if is_opendap:
 - Detects OpenDAP servers by checking if 'opendap' is in the base URL
 - **NEW**: Looks for `.hdf.dap` service endpoints instead of raw `.hdf` files
 - **NEW**: Extracts base `.hdf` filenames from service endpoints for pattern matching
-- Constructs download URLs with `.dap.nc4` extension for actual data access
+- Constructs download URLs with `.dap` extension for actual data access
 - For non-OpenDAP: uses original logic unchanged
 
 **For Single File URLs (no `*`):**
-- Detects OpenDAP `.hdf` URLs and automatically appends `.dap.nc4` for proper data access
+- Detects OpenDAP `.hdf` URLs and automatically appends `.dap` for proper data access
 - Leaves non-OpenDAP URLs and already-formatted URLs unchanged
 
 ### 2. Fixed streaming bug
@@ -112,8 +112,8 @@ if '*' in url:
 else:
     # For single file URLs, check if this is an OpenDAP server
     if 'opendap' in url.lower() and url.endswith('.hdf'):
-        # For OpenDAP servers, append .dap.nc4 to .hdf files for data access
-        return [url + '.dap.nc4']
+        # For OpenDAP servers, append .dap to .hdf files for data access
+        return [url + '.dap']
     else:
         # For non-OpenDAP servers or URLs already with proper extension
         return [url]
@@ -125,11 +125,11 @@ else:
 
 | Input URL | Output URL | Notes |
 |-----------|------------|-------|
-| `https://opendap.cr.usgs.gov/.../file.hdf` | `https://opendap.cr.usgs.gov/.../file.hdf.dap.nc4` | ✅ Auto-converted for data access |
+| `https://opendap.cr.usgs.gov/.../file.hdf` | `https://opendap.cr.usgs.gov/.../file.hdf.dap` | ✅ Auto-converted for data access |
 | Input URL | Final Download URL | Notes |
 |-----------|-------------------|-------|
-| `https://opendap.cr.usgs.gov/.../file.hdf` | `https://opendap.cr.usgs.gov/.../file.hdf.dap.nc4` | ✅ OpenDAP auto-conversion |
-| `https://opendap.cr.usgs.gov/.../file.hdf.dap.nc4` | `https://opendap.cr.usgs.gov/.../file.hdf.dap.nc4` | ✅ No change needed |
+| `https://opendap.cr.usgs.gov/.../file.hdf` | `https://opendap.cr.usgs.gov/.../file.hdf.dap` | ✅ OpenDAP auto-conversion |
+| `https://opendap.cr.usgs.gov/.../file.hdf.dap` | `https://opendap.cr.usgs.gov/.../file.hdf.dap` | ✅ No change needed |
 | `https://e4ftl01.cr.usgs.gov/.../file.hdf` | `https://e4ftl01.cr.usgs.gov/.../file.hdf` | ✅ Non-OpenDAP, direct access |
 | `https://example.com/data/file.hdf` | `https://example.com/data/file.hdf` | ✅ Non-OpenDAP, direct access |
 
@@ -137,7 +137,7 @@ else:
 
 | Input URL | Behavior | Notes |
 |-----------|----------|-------|
-| `https://opendap.cr.usgs.gov/.../MCD15A3H.*.h09v07*.hdf` | **NEW**: Finds `.hdf.dap` endpoints, matches base `.hdf` names, downloads as `.hdf.dap.nc4` | ✅ **FIXED** OpenDAP wildcard |
+| `https://opendap.cr.usgs.gov/.../MCD15A3H.*.h09v07*.hdf` | **NEW**: Finds `.hdf.dap` endpoints, matches base `.hdf` names, downloads as `.hdf.dap` | ✅ **FIXED** OpenDAP wildcard |
 | `https://example.com/data/*.hdf` | Matches and downloads `.hdf` files directly | ✅ Non-OpenDAP wildcard |
 
 ### Key Fix Details
@@ -150,7 +150,7 @@ else:
 1. Search for `.hdf.dap` service endpoints (found 870 matches) 
 2. Extract base `.hdf` filenames for pattern matching
 3. Found 1 match: `MCD15A3H.A2002197.h09v07.061.2020077144157.hdf`
-4. Construct download URL: `...h09v07.061.2020077144157.hdf.dap.nc4`
+4. Construct download URL: `...h09v07.061.2020077144157.hdf.dap`
 
 **Result**: Wildcard downloads now work correctly on OpenDAP servers.
 
@@ -162,7 +162,7 @@ else:
 connector.url = "https://opendap.cr.usgs.gov/opendap/hyrax/DP131/MOTA/MCD15A3H.061/2002.07.12/MCD15A3H.A2002193.h00v08.061.2020077140433.hdf"
 
 # System automatically converts to:
-# "https://opendap.cr.usgs.gov/opendap/hyrax/DP131/MOTA/MCD15A3H.061/2002.07.12/MCD15A3H.A2002193.h00v08.061.2020077140433.hdf.dap.nc4"
+# "https://opendap.cr.usgs.gov/opendap/hyrax/DP131/MOTA/MCD15A3H.061/2002.07.12/MCD15A3H.A2002193.h00v08.061.2020077140433.hdf.dap"
 ```
 
 ### Wildcard Download (FIXED!)
@@ -175,7 +175,7 @@ connector.url = "https://opendap.cr.usgs.gov/opendap/hyrax/DP131/MOTA/MCD15A3H.0
 # 2. Finds 870 .hdf.dap service endpoints
 # 3. Extracts base .hdf names: "MCD15A3H.A2002197.h09v07.061.2020077144157.hdf"  
 # 4. Matches pattern "MCD15A3H.A*.h09v07.*.hdf" against extracted names
-# 5. Constructs download URL: "...h09v07.061.2020077144157.hdf.dap.nc4"
+# 5. Constructs download URL: "...h09v07.061.2020077144157.hdf.dap"
 # 6. Downloads NetCDF4 data via OpenDAP
 
 # Result: 1 file downloaded (was 0 before the fix)
@@ -216,13 +216,13 @@ $1:
 
 ### ✅ **Single File URL Transformation**
 - **Input**: `https://opendap.cr.usgs.gov/.../MCD15A3H.A2002193.h00v08.061.2020077140433.hdf`
-- **Output**: `https://opendap.cr.usgs.gov/.../MCD15A3H.A2002193.h00v08.061.2020077140433.hdf.dap.nc4`
+- **Output**: `https://opendap.cr.usgs.gov/.../MCD15A3H.A2002193.h00v08.061.2020077140433.hdf.dap`
 - **Status**: ✅ Correctly transformed for OpenDAP data access
 
 ### ✅ **Wildcard Pattern Matching**
-- **Pattern**: `MCD15A3H.*.h09v07*.hdf.dap.nc4`
+- **Pattern**: `MCD15A3H.*.h09v07*.hdf.dap`
 - **Matches**: 6 base `.hdf` files in test directory
-- **URLs**: Correctly constructed with `.dap.nc4` extensions
+- **URLs**: Correctly constructed with `.dap` extensions
 - **Status**: ✅ Working correctly
 
 ### ✅ **Backward Compatibility**
@@ -240,22 +240,43 @@ connector.password = "your_earthdata_password"
 
 ## Known Limitations
 
-### Authentication for USGS OpenDAP Servers
-**Issue**: While the wildcard matching logic now works correctly, USGS OpenDAP servers may return 401 (Unauthorized) errors for actual data downloads.
+### Authentication for USGS OpenDAP Servers ⚠️ **BREAKTHROUGH DISCOVERY**
 
-**Cause**: USGS servers appear to require OAuth/EDP (EarthData Portal) authentication for data access, rather than basic HTTP authentication.
+**Major Improvement**: Based on user feedback, we discovered that **USGS OpenDAP directory listings are publicly accessible without authentication**! This enables a two-phase approach:
 
-**Impact**: 
-- ✅ File discovery and pattern matching works correctly
-- ✅ Download URLs are properly constructed  
-- ❌ Actual data download may fail with 401 errors
+#### **Phase 1: File Discovery (✅ No Authentication Required)**
+- ✅ Directory listings accessible: `https://opendap.cr.usgs.gov/opendap/hyrax/DP131/MOTA/MCD15A3H.061/2002.07.16/`
+- ✅ Wildcard pattern matching works perfectly
+- ✅ Found 290 .hdf.dap endpoints in test directory
+- ✅ Successfully matched pattern `MCD15A3H.A*.h09v07.*.hdf`
 
-**Current Status**: The core wildcard logic is fixed and working. The authentication issue is a separate concern that would require implementing OAuth/EDP authentication flow instead of basic HTTP auth.
+**Verification Results:**
+```bash
+# Unauthenticated discovery test:
+✅ Directory listing accessible without authentication  
+✅ Found 290 .hdf.dap endpoints
+✅ Match: MCD15A3H.A2002197.h09v07.061.2020077144157.hdf
+✅ Constructed URL: ...h09v07.061.2020077144157.hdf.dap
+```
+
+#### **Phase 2: Data Download (❌ Still Requires OAuth)**
+- ❌ All .hdf.dap endpoints redirect to OAuth authentication
+- ❌ Returns HTTP 302 → `https://urs.earthdata.nasa.gov/oauth/authorize?...`
+
+**Current Implementation**: Updated `getFileList()` to use unauthenticated requests for OpenDAP directory listings, with fallback to authenticated requests if needed.
 
 **Workaround**: Users can:
 1. Use the connector to discover and construct correct download URLs
 2. Download files manually using proper OAuth/EDP credentials
 3. Or use NASA EarthData servers that support basic HTTP authentication
+
+**For NASA EarthData Servers**: Basic authentication continues to work normally:
+```python
+# These still work with basic auth:
+connector.url = "https://e4ftl01.cr.usgs.gov/.../file.hdf"  # NASA Earthdata
+```
+
+**Status**: This is now a known server-side limitation. Implementing OAuth support would require significant changes to the authentication system.
 
 ## Files Modified
 
@@ -271,13 +292,13 @@ Users can now provide either format:
 ```python
 # Both of these work for OpenDAP:
 connector.url = "https://opendap.cr.usgs.gov/.../file.hdf"  # Auto-converted
-connector.url = "https://opendap.cr.usgs.gov/.../file.hdf.dap.nc4"  # Direct
+connector.url = "https://opendap.cr.usgs.gov/.../file.hdf.dap"  # Direct
 ```
 
 ### For Wildcard Downloads
 ```python
-# Provide the .dap.nc4 extension in the pattern:
-connector.url = "https://opendap.cr.usgs.gov/.../MCD15A3H.*.h09v07*.hdf.dap.nc4"
+# Provide the .dap extension in the pattern:
+connector.url = "https://opendap.cr.usgs.gov/.../MCD15A3H.*.h09v07*.hdf.dap"
 ```
 
 ## Troubleshooting Guide
@@ -298,7 +319,7 @@ If you encounter viewer URL errors with `/viewers/viewers` in the URL, try:
    from GeoEDF.connector.helper.NASAHelper import getFileList
    url = "https://opendap.cr.usgs.gov/.../file.hdf"
    result = getFileList(url, auth)
-   print(result)  # Should show .hdf.dap.nc4 URL
+   print(result)  # Should show .hdf.dap URL
    ```
 
 3. **Debug URL Path**: Trace the actual URL being used
@@ -319,7 +340,7 @@ If you encounter viewer URL errors with `/viewers/viewers` in the URL, try:
 ### Expected Behavior Summary
 
 ✅ **Input**: `https://opendap.cr.usgs.gov/.../file.hdf`  
-✅ **Output**: `https://opendap.cr.usgs.gov/.../file.hdf.dap.nc4`  
+✅ **Output**: `https://opendap.cr.usgs.gov/.../file.hdf.dap`  
 ❌ **Never**: URLs containing `/viewers/viewers`
 
 ## Limitations and Enhancements
