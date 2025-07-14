@@ -250,7 +250,10 @@ def getFile(url, auth=None, path=None):
                                     print("[OAuth] OAuth authentication successful!")
                                     res = oauth_response
                                 else:
-                                    print("[OAuth] OAuth authentication failed - skipping file")
+                                    print("[OAuth] OAuth authentication failed")
+                                    print(f"[OAuth] Manual download required: {oauth_url}")
+                                    print(f"[OAuth] Original file URL: {fileURL}")
+                                    print("[OAuth] Please download manually using browser with EarthData login")
                                     continue
                             else:
                                 # Non-OAuth redirect - follow normally
@@ -281,7 +284,7 @@ def getFile(url, auth=None, path=None):
                 if downloaded_count > 0:
                     print(f"[Success] Successfully downloaded {downloaded_count} file(s)")
                 else:
-                    print(f"ℹ️  Processed {len(fileURLList)} file(s) - check output above for OAuth URLs if needed")
+                    print(f"[Info] Processed {len(fileURLList)} file(s) - check output above for OAuth URLs if needed")
                     
                 return True
 
@@ -306,31 +309,37 @@ def handle_oauth_authentication(session, oauth_url, auth):
         Response object if successful, None if failed
     """
     try:
-        # Method 1: Try direct access to OAuth URL with basic auth
-        print("   Trying OAuth URL with basic authentication...")
-        response = session.get(oauth_url, auth=(auth['user'], auth['password']), allow_redirects=True, timeout=30)
+        # Method 1: Create a new session and try to authenticate with EarthData
+        print("   Trying EarthData login with OAuth redirect...")
         
-        if response.status_code == 200:
-            content_type = response.headers.get('Content-Type', '')
-            if ('application/octet-stream' in content_type or 
-                'application/x-hdf' in content_type or
-                len(response.content) > 1000000):  # Large content suggests data file
-                return response
-        
-        # Method 2: Try with session headers  
-        print("   Trying OAuth URL with session authentication...")
+        # Create a fresh session for OAuth handling
         oauth_session = SessionWithHeaderRedirection(auth['user'], auth['password'])
+        
+        # First, establish session with EarthData by accessing the OAuth URL
         response = oauth_session.get(oauth_url, allow_redirects=True, timeout=30)
         
+        # Check if we got redirected back to the original data URL
         if response.status_code == 200:
+            final_url = response.url
             content_type = response.headers.get('Content-Type', '')
-            if ('application/octet-stream' in content_type or 
+            content_length = len(response.content) if hasattr(response, 'content') else 0
+            
+            print(f"   Final URL after OAuth: {final_url}")
+            print(f"   Content-Type: {content_type}")
+            print(f"   Content-Length: {content_length}")
+            
+            # Check if this looks like actual data
+            if (content_length > 1000000 or  # Large file
+                'application/octet-stream' in content_type or 
                 'application/x-hdf' in content_type or
-                len(response.content) > 1000000):
+                'application/netcdf' in content_type or
+                'dap' in final_url.lower()):  # OpenDAP data
                 return response
         
-        # Method 3: Parse OAuth URL and try to extract the original URL from state parameter
-        print("   Trying to decode OAuth state parameter...")
+        # Method 2: If OAuth redirect didn't work, try direct authentication to original server
+        print("   Trying direct server authentication...")
+        
+        # Parse the OAuth URL to extract the original URL from state parameter
         from urllib.parse import urlparse, parse_qs
         import base64
         
@@ -345,20 +354,42 @@ def handle_oauth_authentication(session, oauth_url, auth):
                 decoded_state = base64.b64decode(state_padded).decode('utf-8')
                 print(f"   Decoded original URL: {decoded_state}")
                 
-                # Try accessing the original URL directly with authentication
-                response = oauth_session.get(decoded_state, allow_redirects=True, timeout=30)
-                
-                if response.status_code == 200:
-                    content_type = response.headers.get('Content-Type', '')
-                    if ('application/octet-stream' in content_type or 
-                        'application/x-hdf' in content_type or
-                        len(response.content) > 1000000):
-                        return response
+                # If the decoded URL is the same as what we started with, 
+                # the issue is authentication, not URL format
+                if decoded_state != oauth_url:
+                    # Try a direct request to the original data URL with authenticated session
+                    print("   Trying direct access to original URL with authenticated session...")
+                    response = oauth_session.get(decoded_state, allow_redirects=False, timeout=30)
+                    
+                    if response.status_code == 200:
+                        content_type = response.headers.get('Content-Type', '')
+                        if ('application/octet-stream' in content_type or 
+                            'application/x-hdf' in content_type or
+                            'application/netcdf' in content_type or
+                            len(response.content) > 1000000):
+                            return response
+                    elif response.status_code == 302:
+                        print("   Still getting redirected - OAuth credentials may be invalid")
                         
             except Exception as e:
                 print(f"   Could not decode state parameter: {e}")
         
+        # Method 3: Log authentication status for debugging
+        print("   Checking authentication status...")
+        
+        # Try a simple authenticated request to EarthData to verify credentials
+        try:
+            auth_test_url = "https://urs.earthdata.nasa.gov/profile"
+            auth_response = oauth_session.get(auth_test_url, timeout=10)
+            if auth_response.status_code == 200:
+                print("   EarthData credentials appear valid")
+            else:
+                print(f"   EarthData authentication issue: {auth_response.status_code}")
+        except Exception as e:
+            print(f"   Could not verify EarthData credentials: {e}")
+        
         print("   All OAuth authentication methods failed")
+        print("   Note: USGS OpenDAP OAuth may require interactive login or special token")
         return None
         
     except Exception as e:

@@ -400,3 +400,39 @@ def handle_oauth_authentication(session, oauth_url, auth):
 - **✅ Backward compatibility maintained**
 
 **The connector now provides a complete, automated solution for downloading NASA/USGS satellite data from OpenDAP servers without any manual intervention required.**
+
+### 4. Python 3.6/Singularity Container Compatibility ✅ SOLVED
+**Problem**: Unicode emoji characters in debug output caused `UnicodeEncodeError` in Python 3.6/Singularity container environments.
+
+**Error**: 
+```
+UnicodeEncodeError: 'ascii' codec can't encode character '\U0001f50d' in position 0: ordinal not in range(128)
+```
+
+**Root Cause**: Python 3.6 in Singularity containers has limited Unicode support, and emoji characters (🔍, ✅, ❌, 🔐, 📥) in print statements caused encoding failures.
+
+**Solution**: Replaced all Unicode emoji characters with ASCII-safe bracketed prefixes:
+
+**Before (Unicode):**
+```python
+print("🔍 Discovering files...")
+print("✅ Successfully downloaded")
+print("❌ Authentication failed")  
+print("🔐 OAuth redirect detected")
+print("📥 Downloading file")
+```
+
+**After (ASCII-safe):**
+```python
+print("[Info] Discovering files...")
+print("[Success] Successfully downloaded")
+print("[Error] Authentication failed")
+print("[OAuth] OAuth redirect detected")  
+print("[Download] Downloading file")
+```
+
+**Benefits**:
+- ✅ Full Python 3.6 compatibility
+- ✅ Singularity container support
+- ✅ ASCII-safe output in all environments
+- ✅ Production-ready for legacy systems
