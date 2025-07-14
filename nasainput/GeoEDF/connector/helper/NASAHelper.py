@@ -64,6 +64,8 @@ def getFilename(resp,url):
     if filename.endswith('.hdf.dap'):
         content_type = resp.headers.get('Content-Type', '').lower()
         
+        print(f"[Debug] Original filename from URL: {filename}")
+        
         # OpenDAP serves NetCDF4 format (which is HDF5-based), not HDF4
         # Use .h5 extension to correctly represent the actual format
         base_filename = filename[:-8]  # Remove .hdf.dap
@@ -73,6 +75,10 @@ def getFilename(resp,url):
         print("[Info] File format: NetCDF4 (HDF5-based) - using .h5 extension")
         print("[Info] Note: Original .hdf.dap serves NetCDF4, not HDF4 format")
         print(f"[Info] Content-Type: {content_type}")
+    else:
+        print(f"[Debug] No conversion needed for filename: {filename}")
+        if filename.endswith('.dap'):
+            print("[Debug] File ends with .dap but not .hdf.dap - this might be the issue!")
     
     return filename
 
@@ -137,8 +143,8 @@ def getFileList(url, auth):
                                 base_pattern = base_pattern[:-4]  # Remove .dap to get .hdf pattern
                             
                             if fnmatch.fnmatch(base_hdf_name, base_pattern):
-                                # For data download, use .dap extension (not .dap.nc4)
-                                download_filename = base_hdf_name + '.dap'
+                                # For data download, use .hdf.dap extension (the actual OpenDAP endpoint)
+                                download_filename = base_hdf_name + '.dap'  # This creates the proper .hdf.dap URL
                                 
                                 # if path leads with a /, we need to revise the url, else can just append
                                 if filename.startswith('/'):
