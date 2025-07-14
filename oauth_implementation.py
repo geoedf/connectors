@@ -138,8 +138,9 @@ def test_oauth_implementation():
     # Test URL that we know redirects to OAuth
     test_url = "https://opendap.cr.usgs.gov/opendap/hyrax/DP131/MOTA/MCD15A3H.061/2002.07.16/MCD15A3H.A2002197.h09v07.061.2020077144157.hdf.dap"
     
-    # Your bearer token
-    bearer_token = "eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6Imp1bmdoYXdvbyIsImV4cCI6MTc1NzYzNTY1MywiaWF0IjoxNzUyNDUxNjUzLCJpc3MiOiJodHRwczovL3Vycy5lYXJ0aGRhdGEubmFzYS5nb3YiLCJpZGVudGl0eV9wcm92aWRlciI6ImVkbF9vcHMiLCJhY3IiOiJlZGwiLCJhc3N1cmFuY2VfbGV2ZWwiOjN9.ELBSZoXPT0AXzmwciVBYXAltdOtj9oAPrRdtZzWIGmmRj-XOnniFsy79HCFXwdc0RAcd0Fh9QBN1NhMx1UvK9plmiXh2NZzHajgj4GDkuMpAhL9IxgKI5kZo8jlRkkpjSZTkuOcTzKsPqWRmz16dlGBHtzzYkonAH6H8mF3IdQ80SRuED1OxErDupU2tzfinbUat2f-rkGdxDVqKB4yzE-gvxNLaY2TIIXXEtEO8CU_BjATwhgCdbyf6aWs9B9OObeKO9IAeL5qa5QdCZ_89jY22m9Ltqb7-D54aWuLjS8thUeB6Nff7Wzk18cbP2If5r56l32-nZCBlFhmaTI9vyw"
+    # SECURITY: Never hardcode real tokens! Use environment variables or config files
+    # bearer_token = os.getenv('EARTHDATA_BEARER_TOKEN')  # Use this instead
+    bearer_token = "YOUR_BEARER_TOKEN_HERE"  # Replace with actual token from env var
     
     print("Testing OAuth Implementation")
     print("="*60)
