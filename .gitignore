@@ -164,3 +164,22 @@ test_*.py
 
 # Emacs temp files
 *.*~
+
+# Security: Credential files and tokens
+*.key
+*.pem
+*.p12
+*.pfx
+.env
+.env.*
+config/secrets.py
+**/secrets.py
+**/*_token.txt
+**/*_credentials.json
+oauth_tokens/
+credentials/
+keys/
+secrets/
+
+# Jupyter notebook checkpoints with potentially sensitive output
+.ipynb_checkpoints/
