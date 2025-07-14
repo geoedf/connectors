@@ -65,7 +65,7 @@ def getFilename(resp,url):
     
     print(f"[Debug] Original filename from URL (after quote removal): {filename}")
     
-    # For OpenDAP .dap downloads, use correct extension for NetCDF4/HDF5 format
+    # For OpenDAP downloads, handle different format extensions appropriately
     if (filename.endswith('.hdf.dap') or 
         filename.endswith('.hdf.dods') or 
         filename.endswith('.hdf.nc4') or 
@@ -73,29 +73,40 @@ def getFilename(resp,url):
         
         content_type = resp.headers.get('Content-Type', '').lower()
         
-        print("[Debug] Found OpenDAP data file - converting to .h5 format")
+        print("[Debug] Found OpenDAP data file - processing extension")
         
-        # Determine the base filename by removing the OpenDAP extension
-        if filename.endswith('.hdf.dap'):
+        # Determine the base filename and appropriate extension
+        if filename.endswith('.hdf.nc4'):
+            # .nc4 is already NetCDF4/HDF5 format - keep the .nc4 extension
+            base_filename = filename[:-8]  # Remove .hdf.nc4
+            final_extension = '.nc4'
+            format_info = "NetCDF4 format (HDF5-compatible)"
+            keep_original = True
+        elif filename.endswith('.hdf.dap'):
             base_filename = filename[:-8]  # Remove .hdf.dap
-            format_info = "DAP format"
+            final_extension = '.h5'
+            format_info = "DAP format -> HDF5"
+            keep_original = False
         elif filename.endswith('.hdf.dods'):
             base_filename = filename[:-9]  # Remove .hdf.dods
-            format_info = "DODS format (binary)"
-        elif filename.endswith('.hdf.nc4'):
-            base_filename = filename[:-8]  # Remove .hdf.nc4
-            format_info = "NetCDF4 format"
+            final_extension = '.h5'
+            format_info = "DODS format -> HDF5"
+            keep_original = False
         elif filename.endswith('.hdf.nc'):
             base_filename = filename[:-7]  # Remove .hdf.nc
+            final_extension = '.nc'
             format_info = "NetCDF3 format"
+            keep_original = True
         
-        # OpenDAP serves NetCDF4 format (which is HDF5-based), not HDF4
-        # Use .h5 extension to correctly represent the actual format
-        filename = base_filename + '.h5'  # Use .h5 for HDF5/NetCDF4 format
+        # Apply the appropriate extension
+        filename = base_filename + final_extension
         
-        print(f"[Info] OpenDAP file renamed to: {filename}")
-        print(f"[Info] File format: {format_info} -> using .h5 extension")
-        print("[Info] Note: OpenDAP serves NetCDF4/HDF5-based data, not HDF4")
+        print(f"[Info] OpenDAP file processed: {filename}")
+        print(f"[Info] Format: {format_info}")
+        if keep_original:
+            print("[Info] Keeping original extension for format compatibility")
+        else:
+            print("[Info] Converted to .h5 extension for HDF5 tools")
         print(f"[Info] Content-Type: {content_type}")
     else:
         print(f"[Debug] No conversion needed for filename: {filename}")
@@ -166,14 +177,15 @@ def getFileList(url, auth):
                                 base_pattern = base_pattern[:-4]  # Remove .dap to get .hdf pattern
                             
                             if fnmatch.fnmatch(base_hdf_name, base_pattern):
-                                # For OpenDAP data download, prefer binary formats over .dap (which returns XML metadata)
-                                # Try different OpenDAP data access formats in order of preference:
-                                # 1. .dods - Binary DODS format (most reliable for binary data)
-                                # 2. .nc4 - NetCDF4 format (HDF5-based)
+                                # For OpenDAP data download, prefer NetCDF4 format which is HDF5-compatible
+                                # The .nc4 format is what works with h5dump and HDF5 tools
+                                # Order of preference based on compatibility:
+                                # 1. .nc4 - NetCDF4 format (HDF5-based, works with h5dump)
+                                # 2. .dods - Binary DODS format 
                                 # 3. .nc - NetCDF3 format
-                                # 4. .dap - DAP format (may return XML metadata, but keep as fallback)
+                                # 4. .dap - DAP format (may return XML metadata)
                                 
-                                preferred_formats = ['.dods', '.nc4', '.nc', '.dap']
+                                preferred_formats = ['.nc4', '.dods', '.nc', '.dap']
                                 
                                 for format_ext in preferred_formats:
                                     download_filename = base_hdf_name + format_ext
@@ -242,9 +254,9 @@ def getFileList(url, auth):
     else:
         # For single file URLs, check if this is an OpenDAP server
         if 'opendap' in url.lower() and url.endswith('.hdf'):
-            # For OpenDAP servers, prefer binary data formats over .dap (which may return XML)
-            # Try formats in order of preference for binary data
-            preferred_formats = ['.dods', '.nc4', '.nc', '.dap']
+            # For OpenDAP servers, prefer NetCDF4 format which is HDF5-compatible
+            # The .nc4 format is what works with h5dump and HDF5 tools
+            preferred_formats = ['.nc4', '.dods', '.nc', '.dap']
             
             # Return multiple URLs to try in order (download logic will handle fallbacks)
             return [url + format_ext for format_ext in preferred_formats]
@@ -390,10 +402,18 @@ def getFile(url, auth=None, path=None):
                                             # Don't break here - save the file anyway for debugging
                                         elif chunk.startswith(b'\x89HDF'):
                                             print("[Info] Confirmed: Downloaded file is HDF5 binary data")
+                                            if outFilename.endswith('.nc4'):
+                                                print("[Info] NetCDF4 file confirmed - compatible with h5dump")
                                         elif chunk.startswith(b'CDF'):
                                             print("[Info] Confirmed: Downloaded file is NetCDF binary data")
+                                            if outFilename.endswith('.nc4'):
+                                                print("[Info] NetCDF4 file confirmed - compatible with h5dump")
+                                            elif outFilename.endswith('.nc'):
+                                                print("[Info] NetCDF3 file confirmed")
                                         else:
                                             print(f"[Info] Binary data detected (first 20 bytes): {chunk[:20].hex()}")
+                                            if outFilename.endswith('.nc4'):
+                                                print("[Info] Assuming NetCDF4 format based on .nc4 extension")
                                         first_chunk_written = True
                                     outFile.write(chunk)
                             
