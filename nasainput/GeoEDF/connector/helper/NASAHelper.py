@@ -66,19 +66,36 @@ def getFilename(resp,url):
     print(f"[Debug] Original filename from URL (after quote removal): {filename}")
     
     # For OpenDAP .dap downloads, use correct extension for NetCDF4/HDF5 format
-    if filename.endswith('.hdf.dap'):
+    if (filename.endswith('.hdf.dap') or 
+        filename.endswith('.hdf.dods') or 
+        filename.endswith('.hdf.nc4') or 
+        filename.endswith('.hdf.nc')):
+        
         content_type = resp.headers.get('Content-Type', '').lower()
         
-        print("[Debug] Found .hdf.dap file - converting to .h5 format")
+        print("[Debug] Found OpenDAP data file - converting to .h5 format")
+        
+        # Determine the base filename by removing the OpenDAP extension
+        if filename.endswith('.hdf.dap'):
+            base_filename = filename[:-8]  # Remove .hdf.dap
+            format_info = "DAP format"
+        elif filename.endswith('.hdf.dods'):
+            base_filename = filename[:-9]  # Remove .hdf.dods
+            format_info = "DODS format (binary)"
+        elif filename.endswith('.hdf.nc4'):
+            base_filename = filename[:-8]  # Remove .hdf.nc4
+            format_info = "NetCDF4 format"
+        elif filename.endswith('.hdf.nc'):
+            base_filename = filename[:-7]  # Remove .hdf.nc
+            format_info = "NetCDF3 format"
         
         # OpenDAP serves NetCDF4 format (which is HDF5-based), not HDF4
         # Use .h5 extension to correctly represent the actual format
-        base_filename = filename[:-8]  # Remove .hdf.dap
         filename = base_filename + '.h5'  # Use .h5 for HDF5/NetCDF4 format
         
         print(f"[Info] OpenDAP file renamed to: {filename}")
-        print("[Info] File format: NetCDF4 (HDF5-based) - using .h5 extension")
-        print("[Info] Note: Original .hdf.dap serves NetCDF4, not HDF4 format")
+        print(f"[Info] File format: {format_info} -> using .h5 extension")
+        print("[Info] Note: OpenDAP serves NetCDF4/HDF5-based data, not HDF4")
         print(f"[Info] Content-Type: {content_type}")
     else:
         print(f"[Debug] No conversion needed for filename: {filename}")
@@ -149,32 +166,45 @@ def getFileList(url, auth):
                                 base_pattern = base_pattern[:-4]  # Remove .dap to get .hdf pattern
                             
                             if fnmatch.fnmatch(base_hdf_name, base_pattern):
-                                # For data download, use .hdf.dap extension (the actual OpenDAP endpoint)
-                                download_filename = base_hdf_name + '.dap'  # This creates the proper .hdf.dap URL
+                                # For OpenDAP data download, prefer binary formats over .dap (which returns XML metadata)
+                                # Try different OpenDAP data access formats in order of preference:
+                                # 1. .dods - Binary DODS format (most reliable for binary data)
+                                # 2. .nc4 - NetCDF4 format (HDF5-based)
+                                # 3. .nc - NetCDF3 format
+                                # 4. .dap - DAP format (may return XML metadata, but keep as fallback)
                                 
-                                # if path leads with a /, we need to revise the url, else can just append
-                                if filename.startswith('/'):
-                                    # get the URL prefix
-                                    if base_url.startswith('https://'):
-                                        skip = 8 # number of characters to skip in prefix
-                                    elif base_url.startswith('http://'):
-                                        skip = 7
-                                    else:
-                                        skip = 0
+                                preferred_formats = ['.dods', '.nc4', '.nc', '.dap']
+                                
+                                for format_ext in preferred_formats:
+                                    download_filename = base_hdf_name + format_ext
+                                    
+                                    # if path leads with a /, we need to revise the url, else can just append
+                                    if filename.startswith('/'):
+                                        # get the URL prefix
+                                        if base_url.startswith('https://'):
+                                            skip = 8 # number of characters to skip in prefix
+                                        elif base_url.startswith('http://'):
+                                            skip = 7
+                                        else:
+                                            skip = 0
 
-                                    next_slash = base_url.find('/',skip)
-                                    if next_slash != -1:
-                                        url_prefix = base_url[:next_slash]
+                                        next_slash = base_url.find('/',skip)
+                                        if next_slash != -1:
+                                            url_prefix = base_url[:next_slash]
+                                        else:
+                                            url_prefix = base_url
+                                        # Use the directory path from filename but with download_filename
+                                        file_dir = os.path.dirname(filename)
+                                        if file_dir:
+                                            result.append('%s%s/%s' % (url_prefix, file_dir, download_filename))
+                                        else:
+                                            result.append('%s/%s' % (url_prefix, download_filename))
                                     else:
-                                        url_prefix = base_url
-                                    # Use the directory path from filename but with download_filename
-                                    file_dir = os.path.dirname(filename)
-                                    if file_dir:
-                                        result.append('%s%s/%s' % (url_prefix, file_dir, download_filename))
-                                    else:
-                                        result.append('%s/%s' % (url_prefix, download_filename))
-                                else:
-                                    result.append('%s/%s' % (base_url, download_filename))
+                                        result.append('%s/%s' % (base_url, download_filename))
+                                    
+                                    # For now, just add the first preferred format
+                                    # The download logic will handle fallbacks if needed
+                                    break
                     else:
                         # For non-OpenDAP servers, use original logic
                         if fnmatch.fnmatch(actual_filename, filename_pattern):
@@ -211,10 +241,13 @@ def getFileList(url, auth):
             raise GeoEDFError('URL does not point to a file or set of files')
     else:
         # For single file URLs, check if this is an OpenDAP server
-        # and if the URL needs .dap.nc4 extension for data access
         if 'opendap' in url.lower() and url.endswith('.hdf'):
-            # For OpenDAP servers, append .dap to .hdf files for data access
-            return [url + '.dap']
+            # For OpenDAP servers, prefer binary data formats over .dap (which may return XML)
+            # Try formats in order of preference for binary data
+            preferred_formats = ['.dods', '.nc4', '.nc', '.dap']
+            
+            # Return multiple URLs to try in order (download logic will handle fallbacks)
+            return [url + format_ext for format_ext in preferred_formats]
         else:
             # For non-OpenDAP servers or URLs already with proper extension
             return [url]
@@ -272,179 +305,116 @@ def getFile(url, auth=None, path=None):
                 downloaded_count = 0
                 
                 for fileURL in fileURLList:
-                    try:
-                        # Try direct download first
-                        res = session.get(fileURL, stream=True, allow_redirects=False)
+                    # For OpenDAP servers with multiple format options, try each until we get binary data
+                    if isinstance(fileURL, list):
+                        url_attempts = fileURL
+                    else:
+                        url_attempts = [fileURL]
+                    
+                    download_successful = False
+                    
+                    for attempt_url in url_attempts:
+                        if download_successful:
+                            break
+                            
+                        print(f"[Attempt] Trying URL: {attempt_url}")
                         
-                        if res.status_code == 302:
-                            # OAuth redirect detected - handle automatically
-                            oauth_url = res.headers.get('Location')
-                            if oauth_url and 'oauth/authorize' in oauth_url:
-                                print(f"[OAuth] OAuth redirect detected for: {fileURL}")
-                                print("[OAuth] Attempting automated OAuth authentication...")
-                                
-                                # Try automated OAuth authentication
-                                oauth_response = handle_oauth_authentication(session, oauth_url, auth)
-                                
-                                if oauth_response and oauth_response.status_code == 200:
-                                    print("[OAuth] OAuth authentication successful!")
-                                    res = oauth_response
-                                else:
-                                    print("[OAuth] OAuth authentication failed")
+                        try:
+                            # Try direct download first
+                            res = session.get(attempt_url, stream=True, allow_redirects=False)
+                            
+                            if res.status_code == 302:
+                                # OAuth redirect detected - handle automatically
+                                oauth_url = res.headers.get('Location')
+                                if oauth_url and 'oauth/authorize' in oauth_url:
+                                    print(f"[OAuth] OAuth redirect detected for: {attempt_url}")
+                                    print("[OAuth] Attempting automated OAuth authentication...")
                                     
-                                    # Try enhanced alternative approaches
-                                    print("[OAuth] Trying enhanced alternative session-based approaches...")
+                                    # Try automated OAuth authentication
+                                    oauth_response = handle_oauth_authentication(session, oauth_url, auth)
                                     
-                                    success = False
-                                    
-                                    # Method 1: Try direct file access with fresh authenticated session
-                                    print("   Method 1: Fresh authenticated session...")
-                                    fresh_session = SessionWithHeaderRedirection(auth['user'], auth['password'])
-                                    
-                                    # First, ensure EarthData authentication is established
-                                    try:
-                                        auth_check = fresh_session.get("https://urs.earthdata.nasa.gov/profile", timeout=10)
-                                        if auth_check.status_code == 200:
-                                            print("   Fresh EarthData session established")
-                                            
-                                            # Now try the data file with no redirects first
-                                            direct_response = fresh_session.get(fileURL, allow_redirects=False, stream=True, timeout=60)
-                                            print(f"   Direct access response: {direct_response.status_code}")
-                                            
-                                            if direct_response.status_code == 200:
-                                                print("   Direct access successful!")
-                                                res = direct_response
-                                                success = True
-                                            elif direct_response.status_code == 302:
-                                                print("   Still getting OAuth redirect with fresh session")
-                                                
-                                                # Method 2: Try following redirects with fresh session
-                                                print("   Method 2: Following redirects with fresh session...")
-                                                redirect_response = fresh_session.get(fileURL, allow_redirects=True, stream=True, timeout=60)
-                                                print(f"   Redirect response: {redirect_response.status_code}")
-                                                
-                                                if redirect_response.status_code == 200:
-                                                    content_type = redirect_response.headers.get('Content-Type', '')
-                                                    content_length = int(redirect_response.headers.get('Content-Length', 0))
-                                                    print(f"   Content-Type: {content_type}, Length: {content_length}")
-                                                    
-                                                    # Check if this looks like actual data (not an HTML page)
-                                                    if (content_length > 1000000 or
-                                                        'application/octet-stream' in content_type or 
-                                                        'application/x-hdf' in content_type or
-                                                        'application/netcdf' in content_type or
-                                                        'binary' in content_type or
-                                                        content_type.startswith('application/') and 'html' not in content_type):
-                                                        print("   Fresh session with redirects successful!")
-                                                        res = redirect_response
-                                                        success = True
-                                                    else:
-                                                        print("   Response appears to be HTML/text, not data file")
-                                        else:
-                                            print(f"   Fresh session auth failed: {auth_check.status_code}")
-                                    except Exception as e:
-                                        print(f"   Fresh session error: {e}")
-                                    
-                                    # Method 3: Try alternative URL formats
-                                    if not success:
-                                        print("   Method 3: Trying alternative URL formats...")
-                                        
-                                        # Sometimes removing .dap and using .nc4 works
-                                        if fileURL.endswith('.hdf.dap'):
-                                            alt_url = fileURL[:-4] + '.nc4'
-                                            print(f"   Trying .nc4 format: {alt_url}")
-                                            
-                                            try:
-                                                nc4_response = fresh_session.get(alt_url, allow_redirects=True, stream=True, timeout=60)
-                                                if nc4_response.status_code == 200:
-                                                    content_type = nc4_response.headers.get('Content-Type', '')
-                                                    content_length = int(nc4_response.headers.get('Content-Length', 0))
-                                                    
-                                                    if (content_length > 1000000 or
-                                                        'application/octet-stream' in content_type or 
-                                                        'application/netcdf' in content_type):
-                                                        print("   .nc4 format successful!")
-                                                        res = nc4_response
-                                                        success = True
-                                                    else:
-                                                        print(f"   .nc4 response not data: {content_type}, {content_length}")
-                                                else:
-                                                    print(f"   .nc4 format failed: {nc4_response.status_code}")
-                                            except Exception as e:
-                                                print(f"   .nc4 format error: {e}")
-                                    
-                                    if not success:
-                                        print("   Method 4: Direct OAuth URL completion attempt...")
-                                        
-                                        try:
-                                            # Try visiting the OAuth URL directly with authenticated session
-                                            oauth_direct = fresh_session.get(oauth_url, allow_redirects=True, timeout=60)
-                                            print(f"   OAuth direct response: {oauth_direct.status_code}")
-                                            
-                                            if oauth_direct.status_code == 200:
-                                                # Check if we got redirected back to the data URL
-                                                final_url = oauth_direct.url
-                                                print(f"   Final URL after OAuth: {final_url}")
-                                                
-                                                if fileURL in final_url or 'hdf' in final_url:
-                                                    content_type = oauth_direct.headers.get('Content-Type', '')
-                                                    content_length = int(oauth_direct.headers.get('Content-Length', 0))
-                                                    
-                                                    if (content_length > 1000000 or
-                                                        'application/octet-stream' in content_type or 
-                                                        'application/x-hdf' in content_type or
-                                                        'application/netcdf' in content_type):
-                                                        print("   Direct OAuth completion successful!")
-                                                        res = oauth_direct
-                                                        success = True
-                                                    else:
-                                                        print(f"   OAuth response not data: {content_type}, {content_length}")
-                                                else:
-                                                    print("   OAuth didn't redirect to data URL")
-                                            else:
-                                                print(f"   OAuth direct access failed: {oauth_direct.status_code}")
-                                        except Exception as e:
-                                            print(f"   OAuth direct access error: {e}")
-                                    
-                                    if not success:
-                                        # All methods failed - provide manual download info
-                                        print("[OAuth] All automated methods failed")
-                                        print(f"[OAuth] Manual download required: {oauth_url}")
-                                        print(f"[OAuth] Original file URL: {fileURL}")
-                                        print("[OAuth] Please download manually using browser with EarthData login")
+                                    if oauth_response and oauth_response.status_code == 200:
+                                        print("[OAuth] OAuth authentication successful!")
+                                        res = oauth_response
+                                    else:
+                                        print("[OAuth] OAuth authentication failed - trying next URL format")
                                         continue
+                                else:
+                                    # Non-OAuth redirect - follow normally
+                                    res = session.get(attempt_url, stream=True)
+                            
+                            # For direct access (200) or successful OAuth, continue with download
+                            if res.status_code != 200:
+                                print(f"[Error] HTTP {res.status_code} for {attempt_url} - trying next format")
+                                continue
+                            
+                            # Check if we got XML metadata instead of binary data
+                            content_type = res.headers.get('Content-Type', 'unknown')
+                            
+                            # Detect XML metadata responses (common issue with OpenDAP .dap URLs)
+                            is_xml_metadata = False
+                            if ('xml' in content_type.lower() or 
+                                'text' in content_type.lower() or
+                                content_type == 'application/vnd.opendap.dap4.data'):
+                                
+                                # Check first few bytes to confirm it's XML
+                                first_chunk = next(res.iter_content(chunk_size=512), b'')
+                                if first_chunk.startswith(b'<?xml') or first_chunk.startswith(b'<'):
+                                    is_xml_metadata = True
+                                    print(f"[Warning] Got XML metadata from {attempt_url} - trying next format")
+                                    print(f"[Warning] Content-Type: {content_type}")
+                                    continue
+                            
+                            # If we get here, we have a potentially good response
+                            print(f"[Success] Got valid response from: {attempt_url}")
+                            
+                            # get the name of the file to save
+                            outFilename = getFilename(res, attempt_url)
+                            outPath = '%s/%s' % (path, outFilename.strip('"'))
+                            
+                            # Log download details
+                            content_length = res.headers.get('Content-Length', 'unknown')
+                            print(f"[Download] File: {outFilename}")
+                            print(f"[Download] Content-Type: {content_type}")
+                            print(f"[Download] Content-Length: {content_length} bytes")
+                            
+                            # Download and validate the content
+                            with open(outPath, 'wb') as outFile:
+                                first_chunk_written = False
+                                for chunk in res.iter_content(chunk_size=1024*1024):
+                                    if not first_chunk_written and chunk:
+                                        # Check first chunk for content type
+                                        if chunk.startswith(b'<?xml') or chunk.startswith(b'<'):
+                                            print("[Warning] Downloaded file appears to be XML metadata, not binary data")
+                                            print("[Warning] First 200 chars:", chunk[:200])
+                                            # Don't break here - save the file anyway for debugging
+                                        elif chunk.startswith(b'\x89HDF'):
+                                            print("[Info] Confirmed: Downloaded file is HDF5 binary data")
+                                        elif chunk.startswith(b'CDF'):
+                                            print("[Info] Confirmed: Downloaded file is NetCDF binary data")
+                                        else:
+                                            print(f"[Info] Binary data detected (first 20 bytes): {chunk[:20].hex()}")
+                                        first_chunk_written = True
+                                    outFile.write(chunk)
+                            
+                            downloaded_count += 1
+                            download_successful = True
+                            break  # Exit the URL attempts loop since we succeeded
+                            
+                        except requests.exceptions.HTTPError as e:
+                            # Handle individual file download errors gracefully
+                            if hasattr(e.response, 'status_code') and e.response.status_code == 404:
+                                print(f"[Warning] 404 Not Found for {attempt_url} - trying next format")
+                                continue
                             else:
-                                # Non-OAuth redirect - follow normally
-                                res = session.get(fileURL, stream=True)
-                        
-                        # For direct access (200) or successful OAuth, continue with download
-                        if res.status_code != 200:
-                            res.raise_for_status()
-                        
-                        # get the name of the file to save
-                        outFilename = getFilename(res,fileURL)
-                        outPath = '%s/%s' % (path,outFilename.strip('"'))
-                        
-                        # Log download details
-                        content_type = res.headers.get('Content-Type', 'unknown')
-                        content_length = res.headers.get('Content-Length', 'unknown')
-                        print(f"[Download] File: {outFilename}")
-                        print(f"[Download] Content-Type: {content_type}")
-                        print(f"[Download] Content-Length: {content_length} bytes")
-                        
-                        with open(outPath,'wb') as outFile:
-                            for chunk in res.iter_content(chunk_size=1024*1024):
-                                outFile.write(chunk)
-                        downloaded_count += 1
-                        
-                    except requests.exceptions.HTTPError as e:
-                        # Handle individual file download errors gracefully
-                        if hasattr(e.response, 'status_code') and e.response.status_code == 404:
-                            # File not found - skip this file but continue with others
+                                print(f"[Error] HTTP error for {attempt_url}: {e}")
+                                continue
+                        except Exception as e:
+                            print(f"[Error] Unexpected error for {attempt_url}: {e}")
                             continue
-                        else:
-                            # Other HTTP errors should be raised
-                            raise e
+                    
+                    if not download_successful:
+                        print("[Error] All URL formats failed for this file - skipping")
                 
                 # Return True if we successfully processed the request (even if no files downloaded)  
                 if downloaded_count > 0:
