@@ -60,11 +60,16 @@ def getFilename(resp,url):
     else:
         filename = url.split("/")[-1]
     
+    # Remove any surrounding quotes from filename
+    filename = filename.strip('"\'')
+    
+    print(f"[Debug] Original filename from URL (after quote removal): {filename}")
+    
     # For OpenDAP .dap downloads, use correct extension for NetCDF4/HDF5 format
     if filename.endswith('.hdf.dap'):
         content_type = resp.headers.get('Content-Type', '').lower()
         
-        print(f"[Debug] Original filename from URL: {filename}")
+        print("[Debug] Found .hdf.dap file - converting to .h5 format")
         
         # OpenDAP serves NetCDF4 format (which is HDF5-based), not HDF4
         # Use .h5 extension to correctly represent the actual format
@@ -78,7 +83,8 @@ def getFilename(resp,url):
     else:
         print(f"[Debug] No conversion needed for filename: {filename}")
         if filename.endswith('.dap'):
-            print("[Debug] File ends with .dap but not .hdf.dap - this might be the issue!")
+            print("[Debug] File ends with .dap but not .hdf.dap - checking exact format...")
+            print(f"[Debug] Filename length: {len(filename)}, ends with: '{filename[-10:]}'")
     
     return filename
 
