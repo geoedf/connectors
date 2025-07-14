@@ -265,33 +265,123 @@ def getFile(url, auth=None, path=None):
                                 else:
                                     print("[OAuth] OAuth authentication failed")
                                     
-                                    # Try alternative approach: Use the original session with cookies
-                                    print("[OAuth] Trying alternative session-based approach...")
+                                    # Try enhanced alternative approaches
+                                    print("[OAuth] Trying enhanced alternative session-based approaches...")
                                     
-                                    # Sometimes the OAuth process sets cookies that can be used
-                                    # Try the original URL again with the current session
-                                    alt_response = session.get(fileURL, allow_redirects=True, stream=True, timeout=60)
+                                    success = False
                                     
-                                    if alt_response.status_code == 200:
-                                        content_type = alt_response.headers.get('Content-Type', '')
-                                        content_length = int(alt_response.headers.get('Content-Length', 0))
-                                        
-                                        # Check if this looks like actual data (not an HTML page)
-                                        if (content_length > 1000000 or
-                                            'application/octet-stream' in content_type or 
-                                            'application/x-hdf' in content_type or
-                                            'application/netcdf' in content_type or
-                                            'binary' in content_type):
-                                            print("[OAuth] Alternative session approach successful!")
-                                            res = alt_response
+                                    # Method 1: Try direct file access with fresh authenticated session
+                                    print("   Method 1: Fresh authenticated session...")
+                                    fresh_session = SessionWithHeaderRedirection(auth['user'], auth['password'])
+                                    
+                                    # First, ensure EarthData authentication is established
+                                    try:
+                                        auth_check = fresh_session.get("https://urs.earthdata.nasa.gov/profile", timeout=10)
+                                        if auth_check.status_code == 200:
+                                            print("   Fresh EarthData session established")
+                                            
+                                            # Now try the data file with no redirects first
+                                            direct_response = fresh_session.get(fileURL, allow_redirects=False, stream=True, timeout=60)
+                                            print(f"   Direct access response: {direct_response.status_code}")
+                                            
+                                            if direct_response.status_code == 200:
+                                                print("   Direct access successful!")
+                                                res = direct_response
+                                                success = True
+                                            elif direct_response.status_code == 302:
+                                                print("   Still getting OAuth redirect with fresh session")
+                                                
+                                                # Method 2: Try following redirects with fresh session
+                                                print("   Method 2: Following redirects with fresh session...")
+                                                redirect_response = fresh_session.get(fileURL, allow_redirects=True, stream=True, timeout=60)
+                                                print(f"   Redirect response: {redirect_response.status_code}")
+                                                
+                                                if redirect_response.status_code == 200:
+                                                    content_type = redirect_response.headers.get('Content-Type', '')
+                                                    content_length = int(redirect_response.headers.get('Content-Length', 0))
+                                                    print(f"   Content-Type: {content_type}, Length: {content_length}")
+                                                    
+                                                    # Check if this looks like actual data (not an HTML page)
+                                                    if (content_length > 1000000 or
+                                                        'application/octet-stream' in content_type or 
+                                                        'application/x-hdf' in content_type or
+                                                        'application/netcdf' in content_type or
+                                                        'binary' in content_type or
+                                                        content_type.startswith('application/') and 'html' not in content_type):
+                                                        print("   Fresh session with redirects successful!")
+                                                        res = redirect_response
+                                                        success = True
+                                                    else:
+                                                        print("   Response appears to be HTML/text, not data file")
                                         else:
-                                            # Still not working - skip this file
-                                            print(f"[OAuth] Manual download required: {oauth_url}")
-                                            print(f"[OAuth] Original file URL: {fileURL}")
-                                            print("[OAuth] Please download manually using browser with EarthData login")
-                                            continue
-                                    else:
-                                        # Alternative approach also failed
+                                            print(f"   Fresh session auth failed: {auth_check.status_code}")
+                                    except Exception as e:
+                                        print(f"   Fresh session error: {e}")
+                                    
+                                    # Method 3: Try alternative URL formats
+                                    if not success:
+                                        print("   Method 3: Trying alternative URL formats...")
+                                        
+                                        # Sometimes removing .dap and using .nc4 works
+                                        if fileURL.endswith('.hdf.dap'):
+                                            alt_url = fileURL[:-4] + '.nc4'
+                                            print(f"   Trying .nc4 format: {alt_url}")
+                                            
+                                            try:
+                                                nc4_response = fresh_session.get(alt_url, allow_redirects=True, stream=True, timeout=60)
+                                                if nc4_response.status_code == 200:
+                                                    content_type = nc4_response.headers.get('Content-Type', '')
+                                                    content_length = int(nc4_response.headers.get('Content-Length', 0))
+                                                    
+                                                    if (content_length > 1000000 or
+                                                        'application/octet-stream' in content_type or 
+                                                        'application/netcdf' in content_type):
+                                                        print("   .nc4 format successful!")
+                                                        res = nc4_response
+                                                        success = True
+                                                    else:
+                                                        print(f"   .nc4 response not data: {content_type}, {content_length}")
+                                                else:
+                                                    print(f"   .nc4 format failed: {nc4_response.status_code}")
+                                            except Exception as e:
+                                                print(f"   .nc4 format error: {e}")
+                                    
+                                    if not success:
+                                        print("   Method 4: Direct OAuth URL completion attempt...")
+                                        
+                                        try:
+                                            # Try visiting the OAuth URL directly with authenticated session
+                                            oauth_direct = fresh_session.get(oauth_url, allow_redirects=True, timeout=60)
+                                            print(f"   OAuth direct response: {oauth_direct.status_code}")
+                                            
+                                            if oauth_direct.status_code == 200:
+                                                # Check if we got redirected back to the data URL
+                                                final_url = oauth_direct.url
+                                                print(f"   Final URL after OAuth: {final_url}")
+                                                
+                                                if fileURL in final_url or 'hdf' in final_url:
+                                                    content_type = oauth_direct.headers.get('Content-Type', '')
+                                                    content_length = int(oauth_direct.headers.get('Content-Length', 0))
+                                                    
+                                                    if (content_length > 1000000 or
+                                                        'application/octet-stream' in content_type or 
+                                                        'application/x-hdf' in content_type or
+                                                        'application/netcdf' in content_type):
+                                                        print("   Direct OAuth completion successful!")
+                                                        res = oauth_direct
+                                                        success = True
+                                                    else:
+                                                        print(f"   OAuth response not data: {content_type}, {content_length}")
+                                                else:
+                                                    print("   OAuth didn't redirect to data URL")
+                                            else:
+                                                print(f"   OAuth direct access failed: {oauth_direct.status_code}")
+                                        except Exception as e:
+                                            print(f"   OAuth direct access error: {e}")
+                                    
+                                    if not success:
+                                        # All methods failed - provide manual download info
+                                        print("[OAuth] All automated methods failed")
                                         print(f"[OAuth] Manual download required: {oauth_url}")
                                         print(f"[OAuth] Original file URL: {fileURL}")
                                         print("[OAuth] Please download manually using browser with EarthData login")
