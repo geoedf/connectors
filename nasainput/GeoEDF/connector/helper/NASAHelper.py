@@ -59,6 +59,20 @@ def getFilename(resp,url):
             filename = url.split("/")[-1]
     else:
         filename = url.split("/")[-1]
+    
+    # For OpenDAP .dap downloads, rename to standard .hdf extension
+    # Note: OpenDAP .dap content is typically NetCDF4 format, not HDF4
+    if filename.endswith('.hdf.dap'):
+        content_type = resp.headers.get('Content-Type', '').lower()
+        
+        # Remove .dap suffix to get standard .hdf filename
+        # IMPORTANT: The file content is actually NetCDF4 format, not HDF4,
+        # but we use .hdf extension for consistency with expected naming conventions
+        filename = filename[:-4]  # Remove .dap to get .hdf file
+        print(f"[Info] OpenDAP .dap file renamed to: {filename}")
+        print("[Info] Note: File content is NetCDF4 format, not HDF4")
+        print(f"[Info] Content-Type: {content_type}")
+    
     return filename
 
 # get a list of files from the HTTP site & match against the wildcard path in the URL
@@ -397,6 +411,14 @@ def getFile(url, auth=None, path=None):
                         # get the name of the file to save
                         outFilename = getFilename(res,fileURL)
                         outPath = '%s/%s' % (path,outFilename.strip('"'))
+                        
+                        # Log download details
+                        content_type = res.headers.get('Content-Type', 'unknown')
+                        content_length = res.headers.get('Content-Length', 'unknown')
+                        print(f"[Download] File: {outFilename}")
+                        print(f"[Download] Content-Type: {content_type}")
+                        print(f"[Download] Content-Length: {content_length} bytes")
+                        
                         with open(outPath,'wb') as outFile:
                             for chunk in res.iter_content(chunk_size=1024*1024):
                                 outFile.write(chunk)
