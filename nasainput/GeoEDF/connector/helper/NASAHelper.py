@@ -180,7 +180,7 @@ def getFileList(url, auth):
                                 # For OpenDAP data download, prefer NetCDF4 format which is HDF5-compatible
                                 # The .nc4 format is what works with h5dump and HDF5 tools
                                 # Order of preference based on compatibility:
-                                # 1. .nc4 - NetCDF4 format (HDF5-based, works with h5dump)
+                                # 1. .nc4 - NetCDF4 format (HDF5-based, works with )
                                 # 2. .dods - Binary DODS format 
                                 # 3. .nc - NetCDF3 format
                                 # 4. .dap - DAP format (may return XML metadata)
